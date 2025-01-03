@@ -7,9 +7,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/src/components/ui/DropdownMenu';
-import { Button } from '@/src/components/ui/Button';
-import { Avatar } from '@/src/components/ui/Avatar';
+} from '@/components/ui/DropdownMenu';
+import { Button } from '@/components/ui/Button';
+import { Avatar } from '@/components/ui/Avatar';
 import { User } from 'lucide-react';
 
 // TODO: Replace with real user data and auth

@@ -1,8 +1,8 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent } from '@/src/components/ui/Card';
-import { Badge } from '@/src/components/ui/Badge';
-import { formatCurrency } from '@/src/lib/utils';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { formatCurrency } from '@/lib/utils';
 
 interface Subscription {
   id: string;

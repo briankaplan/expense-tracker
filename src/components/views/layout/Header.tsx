@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@/src/components/ui/Button';
-import { ThemeToggle } from '@/src/components/ui/ThemeToggle';
+import { Button } from '@/components/ui/Button';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { UserNav } from './UserNav';
 
 export function Header() {

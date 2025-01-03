@@ -1,6 +1,4 @@
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
+import { chalk, readFile, joinPath, checkFile } from './utils/fs-helpers';
 
 const COMPONENTS = {
   'Button': {
@@ -37,32 +35,34 @@ const COMPONENTS = {
   }
 };
 
-console.log(chalk.blue('\n🔍 Verifying components...\n'));
+export async function verifyComponents(): Promise<void> {
+  console.log(chalk.blue('\n🔍 Verifying components...\n'));
 
-let hasErrors = false;
+  let hasErrors = false;
 
-Object.entries(COMPONENTS).forEach(([name, { path: componentPath, required }]) => {
-  const fullPath = path.join(process.cwd(), componentPath);
-  
-  if (!fs.existsSync(fullPath)) {
-    console.log(chalk.red(`❌ Missing component: ${name}`));
-    hasErrors = true;
-    return;
-  }
-
-  const content = fs.readFileSync(fullPath, 'utf8');
-  required.forEach(req => {
-    if (!content.includes(req)) {
-      console.log(chalk.yellow(`⚠️  ${name} might be missing ${req}`));
+  Object.entries(COMPONENTS).forEach(([name, { path: componentPath, required }]) => {
+    const fullPath = joinPath(process.cwd(), componentPath);
+    
+    if (!checkFile(fullPath)) {
+      console.log(chalk.red(`❌ Missing component: ${name}`));
       hasErrors = true;
+      return;
     }
+
+    const content = readFile(fullPath);
+    required.forEach(req => {
+      if (!content.includes(req)) {
+        console.log(chalk.yellow(`⚠️  ${name} might be missing ${req}`));
+        hasErrors = true;
+      }
+    });
+
+    console.log(chalk.green(`✓ ${name} verified`));
   });
 
-  console.log(chalk.green(`✓ ${name} verified`));
-});
-
-if (hasErrors) {
-  process.exit(1);
-} else {
-  console.log(chalk.green('\n✅ All components verified!\n'));
+  if (hasErrors) {
+    process.exit(1);
+  } else {
+    console.log(chalk.green('\n✅ All components verified!\n'));
+  }
 } 

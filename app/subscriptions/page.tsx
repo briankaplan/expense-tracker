@@ -1,5 +1,5 @@
 import { type Metadata } from 'next';
-import { SubscriptionsView } from '@/src/components/views/subscriptions/SubscriptionsView';
+import { SubscriptionsView } from '@/components/views/subscriptions/SubscriptionsView';
 
 export const metadata: Metadata = {
   title: 'Subscriptions',

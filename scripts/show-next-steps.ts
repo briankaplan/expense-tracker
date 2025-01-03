@@ -1,108 +1,49 @@
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
+const { TRACKED_FEATURES } = require('./track-development');
 
-const REFERENCE_PATHS = [
-  './reference',
-  '../expense-analyzer-new',
-  '../expense-analyzer'
-].filter(dir => fs.existsSync(dir));
-
-if (REFERENCE_PATHS.length === 0) {
-  console.log(chalk.red('\n❌ No reference implementation found!\n'));
-  process.exit(1);
+interface NextStep {
+  feature: string;
+  priority: 'high' | 'medium' | 'low';
+  dependencies: string[];
+  estimatedTime: string;
 }
 
-const REFERENCE_DIR = REFERENCE_PATHS[0];
-
-// Core components we need to implement
-const CORE_COMPONENTS = [
+const NEXT_STEPS: NextStep[] = [
   {
-    name: 'Layout Components',
-    components: [
-      {
-        name: 'MainLayout',
-        path: 'src/components/views/layout/MainLayout.tsx',
-        dependencies: ['Header', 'Sidebar']
-      },
-      {
-        name: 'Header',
-        path: 'src/components/views/layout/Header.tsx',
-        dependencies: ['Button', 'Avatar', 'ThemeToggle']
-      },
-      {
-        name: 'Sidebar',
-        path: 'src/components/views/layout/Sidebar.tsx',
-        dependencies: ['NavLink']
-      }
-    ]
+    feature: 'OpenReport',
+    priority: 'high',
+    dependencies: ['ReportDetails', 'ReceiptMatcher'],
+    estimatedTime: '3-4 hours'
   },
   {
-    name: 'Expense Components',
-    components: [
-      {
-        name: 'ExpenseList',
-        path: 'src/components/views/expenses/ExpenseList.tsx',
-        dependencies: ['DataTable', 'Badge']
-      },
-      {
-        name: 'ExpenseSummary',
-        path: 'src/components/views/expenses/ExpenseSummary.tsx',
-        dependencies: ['Card', 'Badge']
-      }
-    ]
-  },
-  {
-    name: 'UI Components',
-    components: [
-      {
-        name: 'Button',
-        path: 'src/components/ui/Button.tsx',
-        dependencies: []
-      },
-      {
-        name: 'Card',
-        path: 'src/components/ui/Card.tsx',
-        dependencies: []
-      },
-      {
-        name: 'Badge',
-        path: 'src/components/ui/Badge.tsx',
-        dependencies: []
-      },
-      {
-        name: 'DataTable',
-        path: 'src/components/ui/DataTable.tsx',
-        dependencies: ['@tanstack/react-table']
-      }
-    ]
+    feature: 'ReceiptMatcher',
+    priority: 'high',
+    dependencies: ['BatchUploader'],
+    estimatedTime: '4-5 hours'
   }
 ];
 
-console.log(chalk.blue('\n📋 Implementation Status:\n'));
+function showNextSteps() {
+  const pendingFeatures = Object.entries(TRACKED_FEATURES)
+    .filter(([_, feature]) => feature.status === 'pending')
+    .map(([name]) => name);
 
-CORE_COMPONENTS.forEach(group => {
-  console.log(chalk.yellow(`\n${group.name}:`));
-  
-  group.components.forEach(({ name, path: componentPath, dependencies }) => {
-    const currentPath = path.join(process.cwd(), componentPath);
-    const refPath = path.join(REFERENCE_DIR, componentPath);
-    
-    if (!fs.existsSync(currentPath)) {
-      console.log(chalk.red(`\n❌ Missing: ${name}`));
-      console.log(chalk.gray(`  Path: ${componentPath}`));
-      if (dependencies.length) {
-        console.log(chalk.gray('  Dependencies:'));
-        dependencies.forEach(dep => console.log(chalk.gray(`    - ${dep}`)));
-      }
-      
-      if (fs.existsSync(refPath)) {
-        console.log(chalk.green('  ✓ Reference available'));
-      }
-    } else {
-      console.log(chalk.green(`✓ ${name}`));
-    }
+  const nextSteps = NEXT_STEPS
+    .filter(step => pendingFeatures.includes(step.feature))
+    .sort((a, b) => {
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
+
+  console.log(chalk.blue('\n📋 Next Development Steps:\n'));
+  nextSteps.forEach(step => {
+    console.log(chalk.green(`Feature: ${step.feature}`));
+    console.log(`Priority: ${step.priority}`);
+    console.log(`Est. Time: ${step.estimatedTime}`);
+    console.log(`Dependencies: ${step.dependencies.join(', ')}\n`);
   });
-});
+}
 
-console.log('\n'); 
+showNextSteps(); 

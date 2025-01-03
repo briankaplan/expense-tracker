@@ -1,25 +1,32 @@
 'use client';
 
+import * as React from 'react';
 import {
-  type ColumnDef,
+  ColumnDef,
   flexRender,
   getCoreRowModel,
   useReactTable,
+  TableState,
 } from '@tanstack/react-table';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  state?: Partial<TableState>;
+  getRowClassName?: (row: TData) => string;
 }
 
 export function DataTable<TData, TValue>({
   columns,
-  data
+  data,
+  state,
+  getRowClassName,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    state,
   });
 
   return (
@@ -29,7 +36,10 @@ export function DataTable<TData, TValue>({
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
-                <th key={header.id} className="border-b px-4 py-2 text-left">
+                <th
+                  key={header.id}
+                  className="border-b px-4 py-2 text-left font-medium"
+                >
                   {header.isPlaceholder
                     ? null
                     : flexRender(
@@ -43,7 +53,10 @@ export function DataTable<TData, TValue>({
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id}>
+            <tr 
+              key={row.id}
+              className={getRowClassName?.(row.original)}
+            >
               {row.getVisibleCells().map((cell) => (
                 <td key={cell.id} className="border-b px-4 py-2">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -2,19 +2,21 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/src/lib/utils';
+import { cn } from '@/lib/utils';
 import { 
   LayoutDashboard, 
   Receipt, 
   Upload,
-  CreditCard
+  CreditCard,
+  Settings
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Expenses', href: '/expenses', icon: Receipt },
   { name: 'Upload', href: '/upload', icon: Upload },
-  { name: 'Subscriptions', href: '/subscriptions', icon: CreditCard }
+  { name: 'Subscriptions', href: '/subscriptions', icon: CreditCard },
+  { name: 'Settings', href: '/settings', icon: Settings }
 ];
 
 export function Sidebar() {

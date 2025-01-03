@@ -1,5 +1,5 @@
 import { type Metadata } from 'next';
-import { ExpenseManagerView } from '@/src/components/views/expenses/ExpenseManagerView';
+import { ExpenseManagerView } from '@/components/views/expenses/ExpenseManagerView';
 
 export const metadata: Metadata = {
   title: 'Dashboard',

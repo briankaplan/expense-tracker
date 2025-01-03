@@ -35,24 +35,33 @@ export async function fetchExpensesFromDb(userId: string, dateRange?: [Date, Dat
     id: doc.id,
     ...doc.data(),
     date: doc.data().date.toDate().toISOString(),
+    createdAt: doc.data().createdAt.toDate().toISOString(),
+    lastModified: doc.data().lastModified 
+      ? doc.data().lastModified.toDate().toISOString()
+      : undefined
   })) as Expense[];
 }
 
 export async function createExpenseInDb(
   userId: string, 
-  expense: Omit<Expense, 'id'>
+  expense: Omit<Expense, 'id' | 'createdAt'>
 ) {
   const expensesRef = collection(db, 'expenses');
+  const now = Timestamp.now();
+  
   const docRef = await addDoc(expensesRef, {
     ...expense,
     userId,
     date: Timestamp.fromDate(new Date(expense.date)),
-    createdAt: Timestamp.now(),
+    createdAt: now,
+    lastModified: now
   });
 
   return {
     id: docRef.id,
     ...expense,
+    createdAt: now.toDate().toISOString(),
+    lastModified: now.toDate().toISOString()
   };
 }
 

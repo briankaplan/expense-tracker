@@ -1,11 +1,11 @@
-const {
+import {
   chalk,
   checkDirectory,
   checkFile,
   readDirectory,
   readFile,
   joinPath
-} = require('./utils/fs-helpers');
+} from './utils/fs-helpers';
 
 interface DirectoryStructure {
   [key: string]: string[];
@@ -20,8 +20,12 @@ const REQUIRED_STRUCTURE: DirectoryStructure = {
     'DropdownMenu.tsx',
     'ThemeToggle.tsx',
     'Avatar.tsx',
-    'SearchInput.tsx',
-    'DateRangePicker.tsx'
+    'Dialog.tsx',
+    'Label.tsx',
+    'DatePicker.tsx',
+    'Calendar.tsx',
+    'Popover.tsx',
+    'Select.tsx'
   ],
   'src/components/providers': [
     'ThemeProvider.tsx'
@@ -32,44 +36,30 @@ const REQUIRED_STRUCTURE: DirectoryStructure = {
     'Sidebar.tsx',
     'UserNav.tsx'
   ],
-  'src/components/views/dashboard': [
-    'DashboardView.tsx',
-    'RecentExpenses.tsx',
-    'RecentReceipts.tsx',
-    'PeriodSummary.tsx'
-  ],
   'src/components/views/expenses': [
     'ExpenseManagerView.tsx',
     'ExpenseList.tsx',
-    'ExpenseSummary.tsx',
-    'ExpenseQuickActions.tsx',
-    'ReceiptMatcher.tsx'
+    'ExpenseSummary.tsx'
   ],
   'src/components/views/reports': [
+    'ReportsView.tsx',
     'ReportList.tsx',
-    'ReportDetail.tsx',
-    'ReportSummary.tsx',
-    'CategoryBreakdown.tsx'
-  ],
-  'src/components/views/receipts': [
-    'ReceiptUploader.tsx',
-    'ReceiptGallery.tsx',
-    'ReceiptDetail.tsx',
+    'OpenReport.tsx',
+    'ReportCard.tsx',
+    'ReportDetails.tsx',
+    'ReceiptMatcher.tsx',
     'BatchUploader.tsx'
   ],
-  'src/lib/services': [
-    'teller.ts',
-    'mindee.ts',
-    'gmail.ts',
-    'dropbox.ts',
-    'openai.ts'
+  'src/contexts': [
+    'ReportsContext.tsx'
   ],
-  'src/lib/hooks': [
-    'useExpenses.ts',
-    'useReceipts.ts',
-    'useReports.ts',
-    'useTeller.ts',
-    'useGmail.ts'
+  'src/types': [
+    'expenses.ts',
+    'reports.ts',
+    'receipts.ts'
+  ],
+  'src/lib': [
+    'utils/index.ts'
   ],
   'app': [
     'layout.tsx',
@@ -78,22 +68,16 @@ const REQUIRED_STRUCTURE: DirectoryStructure = {
   'app/expenses': [
     'page.tsx'
   ],
+  'app/upload': [
+    'layout.tsx',
+    'page.tsx'
+  ],
   'app/reports': [
     'page.tsx',
-    '[id]/page.tsx'
-  ],
-  'app/receipts': [
-    'page.tsx',
-    'upload/page.tsx'
-  ],
-  'app/settings': [
-    'page.tsx',
-    'connections/page.tsx',
-    'profile/page.tsx'
+    'layout.tsx'
   ]
 };
 
-// Add type for fs.Dirent
 interface Dirent {
   isDirectory(): boolean;
   name: string;
@@ -101,51 +85,65 @@ interface Dirent {
 
 console.log(chalk.blue('\n🔍 Verifying project structure...\n'));
 
-let hasErrors = false;
+export async function verifyCleanup(): Promise<void> {
+  let hasErrors = false;
 
-// Check directories and files
-Object.entries(REQUIRED_STRUCTURE).forEach(([dir, expectedFiles]) => {
-  const fullPath = joinPath(process.cwd(), dir);
-  
-  if (!checkDirectory(fullPath)) {
-    console.log(chalk.red(`❌ Missing directory: ${dir}`));
-    hasErrors = true;
-    return;
-  }
-
-  expectedFiles.forEach(file => {
-    const filePath = joinPath(fullPath, file);
-    if (!checkFile(filePath)) {
-      console.log(chalk.red(`❌ Missing file: ${joinPath(dir, file)}`));
-      hasErrors = true;
-    }
-  });
-});
-
-// Check imports
-function checkImports(dir: string): void {
-  const contents = readDirectory(dir, { withFileTypes: true }) as Dirent[];
-  
-  contents.forEach(item => {
-    const fullPath = joinPath(dir, item.name);
+  Object.entries(REQUIRED_STRUCTURE).forEach(([dir, expectedFiles]) => {
+    const fullPath = joinPath(process.cwd(), dir);
     
-    if (item.isDirectory()) {
-      checkImports(fullPath);
-    } else if (item.name.endsWith('.tsx') || item.name.endsWith('.ts')) {
-      const content = readFile(fullPath);
-      if (content.includes('@/components/') && !content.includes('@/src/components/')) {
-        console.log(chalk.yellow(`⚠️  Incorrect import path in: ${fullPath}`));
+    if (!checkDirectory(fullPath)) {
+      console.log(chalk.red(`❌ Missing directory: ${dir}`));
+      hasErrors = true;
+      return;
+    }
+
+    expectedFiles.forEach(file => {
+      const filePath = joinPath(fullPath, file);
+      if (!checkFile(filePath)) {
+        console.log(chalk.red(`❌ Missing file: ${joinPath(dir, file)}`));
         hasErrors = true;
       }
-    }
+    });
   });
-}
 
-checkImports(joinPath(process.cwd(), 'src'));
+  function checkImports(dir: string): void {
+    const contents = readDirectory(dir, { withFileTypes: true }) as Dirent[];
+    
+    contents.forEach(item => {
+      const fullPath = joinPath(dir, item.name);
+      
+      if (item.isDirectory()) {
+        checkImports(fullPath);
+      } else if (item.name.endsWith('.tsx') || item.name.endsWith('.ts')) {
+        const content = readFile(fullPath);
+        
+        // Check for incorrect import paths
+        const incorrectPatterns = [
+          /@\/src\//,                    // @/src/ prefix
+          /from ['"]\.\.\/src\//,        // relative path to src
+          /from ['"]src\//,              // direct src import
+          /from ['"]\.\.\/\.\.\/src\//,  // deep relative path to src
+          /from ['"]@\/components\/ui\/[a-z]/  // lowercase UI component names
+        ];
 
-if (hasErrors) {
-  console.log(chalk.red('\n❌ Verification failed! See errors above.\n'));
-  process.exit(1);
-} else {
-  console.log(chalk.green('\n✅ All structure checks passed!\n'));
+        for (const pattern of incorrectPatterns) {
+          if (pattern.test(content)) {
+            console.log(chalk.yellow(`⚠️  Incorrect import path in: ${fullPath}`));
+            hasErrors = true;
+            break;
+          }
+        }
+      }
+    });
+  }
+
+  checkImports(joinPath(process.cwd(), 'src'));
+  checkImports(joinPath(process.cwd(), 'app'));
+
+  if (hasErrors) {
+    console.log(chalk.red('\n❌ Verification failed! See errors above.\n'));
+    process.exit(1);
+  } else {
+    console.log(chalk.green('\n✅ All structure checks passed!\n'));
+  }
 } 

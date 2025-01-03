@@ -1,0 +1,10 @@
+# Global owners
+* @briankaplan
+
+# Core app files
+/src/lib/services/ @briankaplan
+/src/components/views/ @briankaplan
+
+# Configuration files
+*.config.js @briankaplan
+*.config.ts @briankaplan 

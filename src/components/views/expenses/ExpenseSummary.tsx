@@ -1,21 +1,25 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent } from '@/src/components/ui/Card';
-import { Badge } from '@/src/components/ui/Badge';
-import { formatCurrency } from '@/src/lib/utils';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { formatCurrency } from '@/lib/utils';
 
 interface ExpenseSummaryProps {
   totalExpenses: number;
   matchedExpenses: number;
   unmatchedExpenses: number;
   pendingExpenses: number;
+  businessTotal: number;
+  personalTotal: number;
 }
 
 export function ExpenseSummary({
   totalExpenses,
   matchedExpenses,
   unmatchedExpenses,
-  pendingExpenses
+  pendingExpenses,
+  businessTotal,
+  personalTotal
 }: ExpenseSummaryProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -25,6 +29,11 @@ export function ExpenseSummary({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
+          <div className="text-xs text-muted-foreground">
+            Business: {formatCurrency(businessTotal)}
+            <br />
+            Personal: {formatCurrency(personalTotal)}
+          </div>
         </CardContent>
       </Card>
 
@@ -41,7 +50,7 @@ export function ExpenseSummary({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Unmatched</CardTitle>
-          <Badge variant="error">Unmatched</Badge>
+          <Badge variant="destructive">Unmatched</Badge>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{formatCurrency(unmatchedExpenses)}</div>
