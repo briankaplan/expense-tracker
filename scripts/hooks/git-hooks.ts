@@ -12,8 +12,11 @@ npm run n brain
   'pre-push': `
 #!/bin/sh
 # Run verifications before push
-npm run n verify-scripts
-npm run n impact
+npm run verify
+npm run verify:structure
+npm run verify:imports
+npm run verify:types
+npm run verify:components
 `,
   'post-merge': `
 #!/bin/sh
