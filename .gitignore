@@ -6,8 +6,8 @@
 .env.*.local
 
 # Dependencies
-node_modules/
-.pnp/
+/node_modules
+/.pnp
 .pnp.js
 
 # Build outputs
@@ -28,3 +28,26 @@ yarn-error.log*
 *.swo
 .DS_Store
 *.pem
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Nexus Guard
+/backups
+/logs
+checksums.json
+*.backup
