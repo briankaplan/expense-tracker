@@ -1,44 +1,57 @@
-import { useNexus } from '@/contexts/NexusContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Progress } from '@/components/ui/Progress';
+import { useNexusState } from '@/lib/hooks/useNexusState';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+
+interface ScriptStatus {
+  name: string;
+  status: 'idle' | 'running' | 'completed' | 'failed';
+  lastRun?: string;
+  error?: string;
+}
+
+interface NexusState {
+  scripts: Record<string, ScriptStatus>;
+  isInitialized: boolean;
+  error: Error | null;
+}
 
 export function ScriptManager() {
-  const { state } = useNexus();
-  const { scriptStatus } = state;
+  const state = useNexusState();
+  const scriptStatus = state.scripts as Record<string, ScriptStatus>;
 
-  const total = scriptStatus.total || 1; // Prevent division by zero
-  const activePercent = (scriptStatus.active / total) * 100;
-  const outdatedPercent = (scriptStatus.outdated / total) * 100;
-  const missingPercent = (scriptStatus.missing / total) * 100;
+  if (!scriptStatus) {
+    return null;
+  }
+
+  const totalScripts = Object.keys(scriptStatus).length;
+  const activeScripts = Object.values(scriptStatus).filter(script => script.status === 'running').length;
+  const progress = totalScripts > 0 ? (activeScripts / totalScripts) * 100 : 0;
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Script Status Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Active Scripts</span>
-              <span className="text-green-600">{scriptStatus.active}</span>
-            </div>
-            <Progress value={activePercent} className="bg-green-200" />
-
-            <div className="flex justify-between text-sm mt-4">
-              <span>Outdated Scripts</span>
-              <span className="text-yellow-600">{scriptStatus.outdated}</span>
-            </div>
-            <Progress value={outdatedPercent} className="bg-yellow-200" />
-
-            <div className="flex justify-between text-sm mt-4">
-              <span>Missing Scripts</span>
-              <span className="text-red-600">{scriptStatus.missing}</span>
-            </div>
-            <Progress value={missingPercent} className="bg-red-200" />
+    <Card>
+      <CardHeader>
+        <CardTitle>Script Manager</CardTitle>
+        <CardDescription>Monitor and manage Nexus scripts</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span>Active Scripts</span>
+            <span>{activeScripts} / {totalScripts}</span>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+          <Progress value={progress} />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-sm text-muted-foreground">Outdated</span>
+              <p className="text-2xl font-bold">{Object.values(scriptStatus).filter(script => script.status === 'outdated').length}</p>
+            </div>
+            <div>
+              <span className="text-sm text-muted-foreground">Missing</span>
+              <p className="text-2xl font-bold">{Object.values(scriptStatus).filter(script => script.status === 'missing').length}</p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 } 

@@ -1,9 +1,10 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { formatCurrency } from '@/lib/utils';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import { Download, Eye, CheckCircle, XCircle } from 'lucide-react';
 
 interface ReportCardProps {
   id: string;
@@ -15,7 +16,10 @@ interface ReportCardProps {
   missingComments: number;
   dateCreated: string;
   dateClosed?: string;
-  onOpen: (id: string) => void;
+  onView?: (id: string) => void;
+  onExport?: (id: string) => void;
+  onApprove?: (id: string) => void;
+  onReject?: (id: string) => void;
 }
 
 export function ReportCard({
@@ -28,14 +32,23 @@ export function ReportCard({
   missingComments,
   dateCreated,
   dateClosed,
-  onOpen
+  onView,
+  onExport,
+  onApprove,
+  onReject
 }: ReportCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">
-          Report #{id}
-        </CardTitle>
+        <div>
+          <CardTitle className="text-lg font-semibold">
+            {type.charAt(0).toUpperCase() + type.slice(1)} Report
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Created {formatDate(dateCreated)}
+            {dateClosed && ` • Closed ${formatDate(dateClosed)}`}
+          </p>
+        </div>
         <Badge
           variant={status === 'open' ? 'default' : 'secondary'}
         >
@@ -43,43 +56,65 @@ export function ReportCard({
         </Badge>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-2">
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Total Amount</span>
-            <span className="font-medium">{formatCurrency(totalAmount)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Expenses</span>
-            <span className="font-medium">{expenseCount}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Missing Receipts</span>
-            <span className="font-medium">{missingReceipts}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Missing Comments</span>
-            <span className="font-medium">{missingComments}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Created</span>
-            <span className="font-medium">{new Date(dateCreated).toLocaleDateString()}</span>
-          </div>
-          {dateClosed && (
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Closed</span>
-              <span className="font-medium">{new Date(dateClosed).toLocaleDateString()}</span>
+        <div className="grid gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
+              <p className="text-2xl font-bold">{formatCurrency(totalAmount)}</p>
             </div>
-          )}
-          {status === 'open' && (
-            <Button
-              className="mt-4"
-              onClick={() => onOpen(id)}
-            >
-              Open Report
-            </Button>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Expenses</p>
+              <p className="text-2xl font-bold">{expenseCount}</p>
+            </div>
+          </div>
+          {(missingReceipts > 0 || missingComments > 0) && (
+            <div className="grid grid-cols-2 gap-4">
+              {missingReceipts > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-red-500">Missing Receipts</p>
+                  <p className="text-lg font-semibold text-red-500">{missingReceipts}</p>
+                </div>
+              )}
+              {missingComments > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-yellow-500">Missing Comments</p>
+                  <p className="text-lg font-semibold text-yellow-500">{missingComments}</p>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </CardContent>
+      <CardFooter className="flex justify-end gap-2">
+        {onView && (
+          <Button variant="ghost" size="sm" onClick={() => onView(id)}>
+            <Eye className="h-4 w-4 mr-2" />
+            View
+          </Button>
+        )}
+        {onExport && (
+          <Button variant="ghost" size="sm" onClick={() => onExport(id)}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+        )}
+        {status === 'open' && (
+          <>
+            {onApprove && (
+              <Button variant="default" size="sm" onClick={() => onApprove(id)}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Approve
+              </Button>
+            )}
+            {onReject && (
+              <Button variant="destructive" size="sm" onClick={() => onReject(id)}>
+                <XCircle className="h-4 w-4 mr-2" />
+                Reject
+              </Button>
+            )}
+          </>
+        )}
+      </CardFooter>
     </Card>
   );
 } 

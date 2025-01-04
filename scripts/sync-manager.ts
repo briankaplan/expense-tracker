@@ -1,138 +1,108 @@
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
+import * as fs from 'fs';
+import * as path from 'path';
+import chalk from 'chalk';
+import { sessionManager } from './session-state';
+
+interface SyncConfig {
+  syncInterval: number;
+  backupInterval: number;
+  maxBackups: number;
+  backupDir: string;
+}
 
 class StateSync {
   private config: SyncConfig = {
-    syncInterval: 30000, // 30 seconds
-    backupInterval: 3600000, // 1 hour
-    maxBackups: 10
+    syncInterval: 5 * 60 * 1000, // 5 minutes
+    backupInterval: 60 * 60 * 1000, // 1 hour
+    maxBackups: 10,
+    backupDir: path.join(process.cwd(), 'backups'),
   };
 
-  private backupPath = path.join(process.cwd(), 'backups');
-  private syncInterval: NodeJS.Timer;
-  private backupInterval: NodeJS.Timer;
+  private syncIntervalId?: NodeJS.Timeout;
+  private backupIntervalId?: NodeJS.Timeout;
 
-  start() {
-    console.log(chalk.blue('\n🔄 Starting State Synchronization\n'));
-
-    // Start periodic sync
-    this.syncInterval = setInterval(() => {
-      this.syncState();
-    }, this.config.syncInterval);
-
-    // Start periodic backups
-    this.backupInterval = setInterval(() => {
-      this.createBackup();
-    }, this.config.backupInterval);
-
-    // Initial sync
-    this.syncState();
+  constructor() {
+    // Ensure backup directory exists
+    if (!fs.existsSync(this.config.backupDir)) {
+      fs.mkdirSync(this.config.backupDir, { recursive: true });
+    }
   }
 
-  stop() {
-    clearInterval(this.syncInterval);
-    clearInterval(this.backupInterval);
+  start(): void {
+    this.syncIntervalId = setInterval(() => this.sync(), this.config.syncInterval);
+    this.backupIntervalId = setInterval(() => this.backup(), this.config.backupInterval);
   }
 
-  private async syncState() {
+  stop(): void {
+    if (this.syncIntervalId) {
+      clearInterval(this.syncIntervalId);
+    }
+    if (this.backupIntervalId) {
+      clearInterval(this.backupIntervalId);
+    }
+  }
+
+  private async sync(): Promise<void> {
     try {
-      // Sync git state
-      const gitState = this.getGitState();
-      
-      // Sync project state
-      const projectStateData = projectState.getState();
-      
+      // Sync with remote state if needed
+      this.logSync('State synced successfully');
+
       // Update session state
       sessionManager.updateState({
         currentContext: {
           ...sessionManager.getCurrentContext(),
-          lastCommand: gitState.lastCommand,
-          recentFiles: gitState.recentFiles
+          lastSync: new Date().toISOString(),
         },
-        projectState: {
-          ...projectStateData,
-          phase: this.determineProjectPhase(projectStateData)
-        }
       });
-
-      this.logSync('State synchronized successfully');
     } catch (error) {
-      this.logSync('Sync failed: ' + error.message, 'error');
+      if (error instanceof Error) {
+        this.logSync('Sync failed: ' + error.message, 'error');
+      }
     }
   }
 
-  private createBackup() {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupFile = path.join(this.backupPath, `state-${timestamp}.json`);
-
+  private async backup(): Promise<void> {
     try {
-      // Ensure backup directory exists
-      if (!fs.existsSync(this.backupPath)) {
-        fs.mkdirSync(this.backupPath, { recursive: true });
-      }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupPath = path.join(this.config.backupDir, `state-${timestamp}.json`);
 
-      // Create backup
       const state = {
+        timestamp,
         session: sessionManager.getState(),
-        project: projectState.getState()
       };
 
-      fs.writeFileSync(backupFile, JSON.stringify(state, null, 2));
-
-      // Cleanup old backups
-      this.cleanupOldBackups();
-
+      fs.writeFileSync(backupPath, JSON.stringify(state, null, 2));
       this.logSync('Backup created successfully');
+      this.cleanupOldBackups();
     } catch (error) {
-      this.logSync('Backup failed: ' + error.message, 'error');
+      if (error instanceof Error) {
+        this.logSync('Backup failed: ' + error.message, 'error');
+      }
     }
   }
 
-  private cleanupOldBackups() {
-    const files = fs.readdirSync(this.backupPath)
-      .filter(f => f.startsWith('state-'))
-      .map(f => ({
+  private cleanupOldBackups(): void {
+    const files = fs.readdirSync(this.config.backupDir)
+      .filter((f: string) => f.startsWith('state-'))
+      .map((f: string) => ({
         name: f,
-        time: fs.statSync(path.join(this.backupPath, f)).mtime.getTime()
+        time: fs.statSync(path.join(this.config.backupDir, f)).mtime.getTime(),
       }))
       .sort((a, b) => b.time - a.time);
 
-    // Remove excess backups
-    files.slice(this.config.maxBackups).forEach(file => {
-      fs.unlinkSync(path.join(this.backupPath, file.name));
-    });
-  }
-
-  private getGitState() {
-    try {
-      const lastCommand = execSync('git reflog -n 1').toString().trim();
-      const recentFiles = execSync('git diff --name-only HEAD~1').toString().split('\n').filter(Boolean);
-      return { lastCommand, recentFiles };
-    } catch (error) {
-      return { lastCommand: '', recentFiles: [] };
+    if (files.length > this.config.maxBackups) {
+      files.slice(this.config.maxBackups).forEach((file) => {
+        fs.unlinkSync(path.join(this.config.backupDir, file.name));
+      });
     }
   }
 
-  private determineProjectPhase(state: any): string {
-    // Implement phase determination logic based on project state
-    return 'development';
-  }
-
-  private logSync(message: string, type: 'info' | 'error' = 'info') {
+  private logSync(message: string, level: 'info' | 'error' = 'info'): void {
     const timestamp = new Date().toISOString();
-    const logMessage = `[${timestamp}] ${message}`;
-    
-    if (type === 'error') {
-      console.error(chalk.red(logMessage));
-    } else {
-      console.log(chalk.green(logMessage));
-    }
+    const coloredMessage = level === 'error' ? chalk.red(message) : chalk.green(message);
+    console.log(`[${timestamp}] ${coloredMessage}`);
   }
 }
 
-const stateSync = new StateSync();
-
-module.exports = {
-  stateSync
-}; 
+export const stateSync = new StateSync();
+export type { SyncConfig }; 

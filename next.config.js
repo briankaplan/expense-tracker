@@ -1,13 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    // Add any custom webpack configuration here
-    return config;
-  },
   experimental: {
-    appDir: true,
+    serverActions: {
+      allowedOrigins: ['localhost:*']
+    }
   },
-}
+  images: {
+    domains: ['cdn4.iconfinder.com'],
+  },
+};
 
 module.exports = nextConfig; 

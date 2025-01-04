@@ -3,11 +3,6 @@
 import { LoginForm } from '@/components/views/auth/LoginForm';
 import { useRouter } from 'next/navigation';
 
-export const metadata = {
-  title: 'Login | Expense Manager',
-  description: 'Login to your account'
-};
-
 export default function LoginPage() {
   const router = useRouter();
 

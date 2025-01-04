@@ -1,8 +1,83 @@
 'use client';
 
-import { ThemeProvider as NextThemesProvider } from 'next-themes';
-import { type ThemeProviderProps } from 'next-themes/dist/types';
+import { createContext, useContext, useEffect, useState } from 'react';
 
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
-} 
+type Theme = 'dark' | 'light' | 'system';
+
+interface ThemeProviderProps {
+    children: React.ReactNode;
+    defaultTheme?: Theme;
+    attribute?: string;
+    enableSystem?: boolean;
+    disableTransitionOnChange?: boolean;
+}
+
+const ThemeContext = createContext<{
+    theme: Theme;
+    setTheme: (theme: Theme) => void;
+}>({
+    theme: 'system',
+    setTheme: () => null,
+});
+
+export function ThemeProvider({
+    children,
+    defaultTheme = 'system',
+    attribute = 'data-theme',
+    enableSystem = true,
+    disableTransitionOnChange = false,
+}: ThemeProviderProps) {
+    const [theme, setTheme] = useState<Theme>(defaultTheme);
+
+    useEffect(() => {
+        const root = window.document.documentElement;
+
+        root.classList.remove('light', 'dark');
+
+        if (theme === 'system' && enableSystem) {
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+            root.classList.add(systemTheme);
+            root.setAttribute(attribute, systemTheme);
+        } else {
+            root.classList.add(theme);
+            root.setAttribute(attribute, theme);
+        }
+
+        if (disableTransitionOnChange) {
+            root.classList.add('[&_*]:!transition-none');
+            window.setTimeout(() => {
+                root.classList.remove('[&_*]:!transition-none');
+            }, 0);
+        }
+    }, [theme, attribute, enableSystem, disableTransitionOnChange]);
+
+    useEffect(() => {
+        if (!enableSystem) return;
+
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = () => {
+            if (theme === 'system') {
+                setTheme('system');
+            }
+        };
+
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }, [theme, enableSystem]);
+
+    return (
+        <ThemeContext.Provider value={{ theme, setTheme }}>
+            {children}
+        </ThemeContext.Provider>
+    );
+}
+
+export const useTheme = () => {
+    const context = useContext(ThemeContext);
+    if (context === undefined) {
+        throw new Error('useTheme must be used within a ThemeProvider');
+    }
+    return context;
+}; 

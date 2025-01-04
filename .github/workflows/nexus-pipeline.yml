@@ -1,0 +1,179 @@
+name: Nexus CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  TELLER_USER_TOKEN: ${{ secrets.TELLER_USER_TOKEN }}
+  MINDEE_API_KEY: ${{ secrets.MINDEE_API_KEY }}
+  CLOUDFLARE_R2_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}
+  CLOUDFLARE_R2_SECRET_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}
+
+jobs:
+  nexus-check:
+    name: Nexus System Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Unified Monitor
+        run: |
+          node -e "
+            const { UnifiedMonitor } = require('./src/nexus/monitor/UnifiedMonitor');
+            const monitor = new UnifiedMonitor();
+            monitor.startMonitoring();
+          "
+
+      - name: Run Auto-fix Check
+        run: |
+          node -e "
+            const { NexusAutoFix } = require('./src/nexus/auto-fix/NexusAutoFix');
+            const autoFix = new NexusAutoFix();
+            autoFix.fixAll();
+          "
+
+  test:
+    needs: nexus-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run Auto-fix System
+        run: |
+          node -e "
+            const { NexusAutoFix } = require('./src/nexus/auto-fix/NexusAutoFix');
+            const autoFix = new NexusAutoFix();
+            autoFix.fixAll();
+          "
+      
+      - name: Type check
+        run: npx tsc --noEmit
+      
+      - name: Lint check
+        run: npx eslint .
+      
+      - name: Run tests
+        run: npm test
+
+  deploy-staging:
+    needs: test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Pre-deployment check
+        run: |
+          node -e "
+            const { UnifiedMonitor } = require('./src/nexus/monitor/UnifiedMonitor');
+            const monitor = new UnifiedMonitor();
+            monitor.checkAllSystems();
+          "
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Deploy to Vercel (Preview)
+        run: |
+          npm i -g vercel
+          vercel --token ${{ secrets.VERCEL_TOKEN }} --confirm
+
+  deploy-production:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run comprehensive checks
+        run: |
+          node -e "
+            const { UnifiedMonitor } = require('./src/nexus/monitor/UnifiedMonitor');
+            const { NexusAutoFix } = require('./src/nexus/auto-fix/NexusAutoFix');
+            
+            async function runChecks() {
+              const monitor = new UnifiedMonitor();
+              const autoFix = new NexusAutoFix();
+              
+              await Promise.all([
+                monitor.checkAllSystems(),
+                autoFix.fixAll()
+              ]);
+            }
+            
+            runChecks();
+          "
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Deploy to Vercel (Production)
+        run: |
+          npm i -g vercel
+          vercel --token ${{ secrets.VERCEL_TOKEN }} --prod --confirm
+
+  monitoring:
+    needs: [deploy-staging, deploy-production]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Setup monitoring
+        run: |
+          node -e "
+            const { UnifiedMonitor } = require('./src/nexus/monitor/UnifiedMonitor');
+            const monitor = new UnifiedMonitor();
+            monitor.startMonitoring();
+          " 

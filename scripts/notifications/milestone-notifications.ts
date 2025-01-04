@@ -1,126 +1,106 @@
-const chalk = require('chalk');
-const { MilestoneTracker } = require('../milestone-tracker');
-const { sessionManager } = require('../session-state');
-const { PROJECT_DEFINITION } = require('../project-roadmap');
+import * as fs from 'fs';
+import * as path from 'path';
+import chalk from 'chalk';
+import { sessionManager } from '../session-state';
 
-interface MilestoneAlert {
-  type: 'warning' | 'critical' | 'info';
+interface Notification {
+  id: string;
+  type: 'info' | 'warning' | 'error';
   message: string;
-  milestone: string;
-  daysUntilDue?: number;
+  timestamp: string;
 }
 
-class MilestoneNotifier {
-  private tracker: any;
-  private readonly WARNING_THRESHOLD = 7; // Days before deadline to warn
-  private readonly CRITICAL_THRESHOLD = 3; // Days before deadline for critical alert
+export class MilestoneNotifier {
+  private readonly notificationsPath: string;
+  private notifications: Notification[];
 
   constructor() {
-    this.tracker = new MilestoneTracker();
+    this.notificationsPath = path.join(process.cwd(), 'logs', 'notifications.json');
+    this.notifications = this.loadNotifications();
   }
 
-  checkNotifications(): MilestoneAlert[] {
-    const alerts: MilestoneAlert[] = [];
-    
-    // Check each milestone
-    for (const phase of PROJECT_DEFINITION.phases) {
-      for (const milestone of phase.milestones) {
-        if (milestone.status === 'completed') continue;
-
-        const status = this.tracker.getMilestoneStatus(milestone.name);
-        if (!status) continue;
-
-        // Check deadline proximity
-        if (status.remainingDays <= this.CRITICAL_THRESHOLD && status.remainingDays > 0) {
-          alerts.push({
-            type: 'critical',
-            message: `Critical: ${milestone.name} due in ${status.remainingDays} days`,
-            milestone: milestone.name,
-            daysUntilDue: status.remainingDays
-          });
-        } else if (status.remainingDays <= this.WARNING_THRESHOLD && status.remainingDays > this.CRITICAL_THRESHOLD) {
-          alerts.push({
-            type: 'warning',
-            message: `Warning: ${milestone.name} due in ${status.remainingDays} days`,
-            milestone: milestone.name,
-            daysUntilDue: status.remainingDays
-          });
-        }
-
-        // Check blockers
-        if (status.blockers.length > 0) {
-          alerts.push({
-            type: 'warning',
-            message: `Blockers found for ${milestone.name}: ${status.blockers.join(', ')}`,
-            milestone: milestone.name
-          });
-        }
-
-        // Check progress
-        if (status.progress < 30 && status.remainingDays < 14) {
-          alerts.push({
-            type: 'warning',
-            message: `Low progress on ${milestone.name}: ${status.progress}% with ${status.remainingDays} days remaining`,
-            milestone: milestone.name
-          });
-        }
+  private loadNotifications(): Notification[] {
+    try {
+      if (fs.existsSync(this.notificationsPath)) {
+        return JSON.parse(fs.readFileSync(this.notificationsPath, 'utf8'));
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red('Failed to load notifications:'), error.message);
       }
     }
+    return [];
+  }
 
-    return alerts;
+  private saveNotifications(): void {
+    try {
+      fs.writeFileSync(this.notificationsPath, JSON.stringify(this.notifications, null, 2));
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red('Failed to save notifications:'), error.message);
+      }
+    }
+  }
+
+  async start(): Promise<void> {
+    try {
+      console.log(chalk.blue('\n🔔 Starting Milestone Notifier\n'));
+      await this.checkMilestones();
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red('Failed to start milestone notifier:'), error.message);
+        throw error;
+      }
+    }
+  }
+
+  private async checkMilestones(): Promise<void> {
+    const context = sessionManager.getCurrentContext();
+    const pendingTasks = context.pendingTasks || [];
+
+    if (pendingTasks.length > 0) {
+      this.addNotification({
+        type: 'info',
+        message: `You have ${pendingTasks.length} pending tasks.`,
+      });
+    }
+
+    this.displayNotifications();
+  }
+
+  addNotification(notification: Omit<Notification, 'id' | 'timestamp'>): void {
+    const newNotification: Notification = {
+      id: Math.random().toString(36).substring(7),
+      timestamp: new Date().toISOString(),
+      ...notification,
+    };
+
+    this.notifications.push(newNotification);
+    this.saveNotifications();
+    this.displayNotification(newNotification);
+  }
+
+  private displayNotification(notification: Notification): void {
+    const icon = notification.type === 'error' ? '❌' :
+                notification.type === 'warning' ? '⚠️' : 'ℹ️';
+    console.log(`${icon} ${notification.message}`);
   }
 
   displayNotifications(): void {
-    const alerts = this.checkNotifications();
-    if (alerts.length === 0) {
-      console.log(chalk.green('\n✅ No milestone alerts\n'));
+    if (this.notifications.length === 0) {
+      console.log(chalk.blue('\nNo notifications\n'));
       return;
     }
 
-    console.log(chalk.yellow('\n🔔 Milestone Alerts\n'));
-    
-    // Group by type
-    const critical = alerts.filter(a => a.type === 'critical');
-    const warnings = alerts.filter(a => a.type === 'warning');
-    const info = alerts.filter(a => a.type === 'info');
-
-    // Display critical first
-    if (critical.length > 0) {
-      console.log(chalk.red('Critical Alerts:'));
-      critical.forEach(alert => {
-        console.log(chalk.red(`❗ ${alert.message}`));
-      });
-      console.log('');
-    }
-
-    // Then warnings
-    if (warnings.length > 0) {
-      console.log(chalk.yellow('Warnings:'));
-      warnings.forEach(alert => {
-        console.log(chalk.yellow(`⚠️  ${alert.message}`));
-      });
-      console.log('');
-    }
-
-    // Then info
-    if (info.length > 0) {
-      console.log(chalk.blue('Information:'));
-      info.forEach(alert => {
-        console.log(chalk.blue(`ℹ️  ${alert.message}`));
-      });
-      console.log('');
-    }
-
-    // Save to session state
-    sessionManager.updateState({
-      currentContext: {
-        ...sessionManager.getCurrentContext(),
-        milestoneAlerts: alerts
-      }
-    });
+    console.log(chalk.blue('\n📬 Notifications\n'));
+    this.notifications
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .forEach(notification => this.displayNotification(notification));
   }
-}
 
-module.exports = {
-  MilestoneNotifier
-}; 
+  clearNotifications(): void {
+    this.notifications = [];
+    this.saveNotifications();
+    console.log(chalk.green('\n✨ Notifications cleared\n'));
+  }
+} 

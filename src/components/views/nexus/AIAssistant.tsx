@@ -1,8 +1,8 @@
 'use client';
 
 import { useNexus } from '@/contexts/NexusContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 export function AIAssistant() {
   const { state, runCommand } = useNexus();

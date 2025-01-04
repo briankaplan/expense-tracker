@@ -1,28 +1,16 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
-const execAsync = promisify(exec);
+import { NextResponse } from 'next/server';
+import { executeCommand } from '@/lib/services/nexus';
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const { command } = await req.json();
-    
-    // Run nexus command
-    const { stdout, stderr } = await execAsync(`npm run n ${command}`);
-    
-    return new Response(JSON.stringify({ 
-      success: true,
-      output: stdout,
-      error: stderr
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ 
+    const { command } = await request.json();
+    const result = await executeCommand(command);
+    return NextResponse.json(result);
+  } catch (err) {
+    const error = err as Error;
+    return NextResponse.json({
       success: false,
-      error: error.message
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+      error: error.message || 'Failed to execute command'
+    }, { status: 500 });
   }
 } 

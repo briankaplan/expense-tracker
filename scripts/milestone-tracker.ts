@@ -1,131 +1,97 @@
-import { projectState } from './state/project-state';
+import * as fs from 'fs';
+import * as path from 'path';
 import chalk from 'chalk';
+import { projectState } from './state/project-state';
 
-interface MilestoneStatus {
+interface Feature {
   name: string;
-  progress: number;
-  completed: number;
-  total: number;
-  remainingDays: number;
-  blockers: string[];
+  status: 'pending' | 'in-progress' | 'completed';
+  priority: 'high' | 'medium' | 'low';
+}
+
+interface Page {
+  features: Feature[];
+}
+
+interface ProjectDefinition {
+  pages: {
+    [key: string]: Page;
+  };
 }
 
 export class MilestoneTracker {
-  generateProgressReport(): string {
-    const state = projectState.getState();
-    const features = this.getFeatureStats();
-    const milestones = this.getMilestones();
-    
-    let report = '\n📈 Project Progress Report\n\n';
-    
-    // Overall Progress
-    report += chalk.yellow('Overall Progress\n');
-    report += `Phase: ${state.currentPhase}\n`;
-    report += `Features: ${features.completed}/${features.total} (${Math.round(features.progress)}%)\n\n`;
-    
-    // Milestones
-    report += chalk.yellow('Milestones\n');
-    milestones.forEach(milestone => {
-      const icon = milestone.progress === 100 ? '✅' : 
-                   milestone.progress > 50 ? '🟡' : '🔴';
-      report += `${icon} ${milestone.name}: ${milestone.progress}%\n`;
-      if (milestone.blockers.length > 0) {
-        report += chalk.red(`   Blockers: ${milestone.blockers.join(', ')}\n`);
+  private readonly logPath: string;
+
+  constructor() {
+    this.logPath = path.join(process.cwd(), 'logs', 'milestones.log');
+    this.ensureLogDirectory();
+  }
+
+  private ensureLogDirectory(): void {
+    const logDir = path.dirname(this.logPath);
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+  }
+
+  async start(): Promise<void> {
+    try {
+      console.log(chalk.blue('\n🎯 Starting Milestone Tracker\n'));
+      await this.trackMilestones();
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red('Failed to start milestone tracker:'), error.message);
+        throw error;
       }
-    });
-    
+    }
+  }
+
+  private async trackMilestones(): Promise<void> {
+    const report = this.generateReport();
+    this.logMilestone(report);
+    console.log(report);
+  }
+
+  private generateReport(): string {
+    let report = chalk.blue('\n📊 Milestone Report\n\n');
+
+    const features = this.collectFeatureStats();
+    report += `Total Features: ${features.total}\n`;
+    report += `Completed: ${features.completed}\n`;
+    report += `In Progress: ${features.inProgress}\n`;
+    report += `Pending: ${features.pending}\n\n`;
+
     return report;
   }
 
-  getMilestoneStatus(name: string): MilestoneStatus | null {
-    const milestones = this.getMilestones();
-    return milestones.find(m => m.name === name) || null;
-  }
-
-  private getFeatureStats() {
-    const state = projectState.getState();
-    let total = 0;
-    let completed = 0;
-
-    Object.values(state.projectDefinition.pages).forEach(page => {
-      page.features.forEach(feature => {
-        total++;
-        if (feature.status === 'completed') completed++;
-      });
-    });
-
-    return {
-      total,
-      completed,
-      progress: (completed / total) * 100
+  private collectFeatureStats(): { total: number; completed: number; inProgress: number; pending: number } {
+    const stats = {
+      total: 0,
+      completed: 0,
+      inProgress: 0,
+      pending: 0,
     };
-  }
 
-  private getMilestones(): MilestoneStatus[] {
     const state = projectState.getState();
-    const milestones: MilestoneStatus[] = [];
+    const activeFeatures = state.activeFeatures || [];
 
-    // Group features by priority to create milestones
-    const priorities = ['high', 'medium', 'low'] as const;
-    
-    priorities.forEach(priority => {
-      const features = this.getFeaturesForPriority(priority);
-      if (features.total > 0) {
-        milestones.push({
-          name: `${priority.charAt(0).toUpperCase() + priority.slice(1)} Priority Features`,
-          progress: (features.completed / features.total) * 100,
-          completed: features.completed,
-          total: features.total,
-          remainingDays: this.estimateRemainingDays(features.remaining),
-          blockers: this.findBlockers(priority)
-        });
+    activeFeatures.forEach(feature => {
+      stats.total++;
+      if (feature.includes('completed:')) {
+        stats.completed++;
+      } else if (feature.includes('in-progress:')) {
+        stats.inProgress++;
+      } else {
+        stats.pending++;
       }
     });
 
-    return milestones;
+    return stats;
   }
 
-  private getFeaturesForPriority(priority: 'high' | 'medium' | 'low') {
-    const state = projectState.getState();
-    let total = 0;
-    let completed = 0;
-    let remaining: string[] = [];
-
-    Object.values(state.projectDefinition.pages).forEach(page => {
-      page.features.forEach(feature => {
-        if (feature.priority === priority) {
-          total++;
-          if (feature.status === 'completed') {
-            completed++;
-          } else {
-            remaining.push(feature.name);
-          }
-        }
-      });
-    });
-
-    return { total, completed, remaining };
-  }
-
-  private estimateRemainingDays(remainingFeatures: string[]): number {
-    // Rough estimate: 2 days per remaining feature
-    return remainingFeatures.length * 2;
-  }
-
-  private findBlockers(priority: string): string[] {
-    const state = projectState.getState();
-    const blockers: string[] = [];
-
-    Object.values(state.projectDefinition.pages).forEach(page => {
-      page.features.forEach(feature => {
-        if (feature.priority === priority && feature.status === 'in-progress') {
-          // In a real app, you might check dependencies, resources, etc.
-          // For now, we'll just flag features that have been "in-progress" too long
-          blockers.push(`${feature.name} (in progress)`);
-        }
-      });
-    });
-
-    return blockers;
+  private logMilestone(message: string): void {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] ${message}\n`;
+    fs.appendFileSync(this.logPath, logMessage);
   }
 } 

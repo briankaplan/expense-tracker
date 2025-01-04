@@ -1,62 +1,52 @@
 import { useState } from 'react';
-import { useNexus } from '@/contexts/NexusContext';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-export function CommandCenter() {
-  const { runCommand } = useNexus();
+interface CommandCenterProps {
+  onExecuteCommand: (command: string) => Promise<void>;
+}
+
+export function CommandCenter({ onExecuteCommand }: CommandCenterProps) {
   const [command, setCommand] = useState('');
+  const [isExecuting, setIsExecuting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!command) return;
-    await runCommand(command);
-    setCommand('');
+  const handleExecute = async () => {
+    if (!command.trim()) return;
+    
+    setIsExecuting(true);
+    try {
+      await onExecuteCommand(command);
+      setCommand('');
+    } catch (error) {
+      console.error('Failed to execute command:', error);
+    } finally {
+      setIsExecuting(false);
+    }
   };
 
-  const quickCommands = [
-    { label: 'Check Status', command: 'status' },
-    { label: 'Verify Scripts', command: 'verify-scripts' },
-    { label: 'Run Brain', command: 'brain' },
-    { label: 'Show Alerts', command: 'alerts' }
-  ];
-
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Commands</CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-2 flex-wrap">
-          {quickCommands.map(cmd => (
-            <Button 
-              key={cmd.command}
-              variant="outline"
-              onClick={() => runCommand(cmd.command)}
-            >
-              {cmd.label}
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Custom Command</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <Input
-              value={command}
-              onChange={(e) => setCommand(e.target.value)}
-              placeholder="Enter command..."
-              className="flex-1"
-            />
-            <Button type="submit">Run</Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Command Center</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-2">
+          <Input
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+            placeholder="Enter Nexus command..."
+            onKeyDown={(e) => e.key === 'Enter' && handleExecute()}
+            disabled={isExecuting}
+          />
+          <Button 
+            onClick={handleExecute}
+            disabled={!command.trim() || isExecuting}
+          >
+            Execute
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 } 

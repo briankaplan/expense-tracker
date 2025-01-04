@@ -3,11 +3,11 @@
 import { ExpenseManagerView } from '@/components/views/expenses/ExpenseManagerView';
 import { useExpenses } from '@/lib/hooks/useExpenses';
 import { useTeller } from '@/lib/providers/TellerProvider';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { toast } from 'react-hot-toast';
-import { Expense } from '@/types/expenses';
+import { Expense } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
-import { Switch } from '@/components/ui/Switch';
+import { Switch } from '@/components/ui/switch';
 
 export default function ExpensesPage() {
   const { expenses, isLoading, updateExpense, addExpense } = useExpenses();
@@ -33,7 +33,7 @@ export default function ExpensesPage() {
     }
   };
 
-  const handleAddExpense = async (expense: Omit<Expense, 'id'>) => {
+  const handleAddExpense = async (expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
     try {
       await addExpense(expense);
       toast.success('Expense added successfully');
@@ -44,11 +44,8 @@ export default function ExpensesPage() {
   };
 
   const handleCreateReport = async (type: 'business' | 'personal') => {
-    // TODO: Implement report generation
-    const reportExpenses = expenses.filter((exp: Expense) => exp.type === type);
-    
-    // For now, just show a success message with the total
-    const total = reportExpenses.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
+    const reportExpenses = expenses.filter(exp => exp.type === type);
+    const total = reportExpenses.reduce((sum, exp) => sum + exp.amount, 0);
     toast.success(
       `${type} report created with ${reportExpenses.length} expenses totaling $${total.toFixed(2)}`
     );

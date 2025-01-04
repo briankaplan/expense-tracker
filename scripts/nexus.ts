@@ -1,60 +1,105 @@
-const chalk = require('chalk');
-const { execSync } = require('child_process');
-const { program } = require('commander');
-const { DevelopmentDashboard } = require('./dashboard');
-const { stateSync } = require('./sync-manager');
-const { recoveryManager } = require('./recovery-manager');
-const { sessionManager } = require('./session-state');
-const { MilestoneTracker } = require('./milestone-tracker');
-const { MilestoneNotifier } = require('./notifications/milestone-notifications');
-const { MilestoneAutomation } = require('./automation/milestone-automation');
-const { AIAssistant } = require('./ai/assistant');
-const { ScriptVerifier } = require('./verify-scripts');
-const { ImpactAnalyzer } = require('./analyze-impact');
-const { DependencyChecker } = require('./dependency-checker');
-const { CriticalPathMonitor } = require('./critical-path-monitor');
-const { NexusBrain } = require('./nexus-brain');
-const { GitHooksManager } = require('./hooks/git-hooks');
-const { projectState } = require('./state/project-state');
-const fs = require('fs');
-const path = require('path');
+import * as fs from 'fs';
+import * as path from 'path';
+import chalk from 'chalk';
+import { execSync } from 'child_process';
+import { Command } from 'commander';
+import { DevelopmentDashboard } from './dashboard';
+import { stateSync } from './sync-manager';
+import { sessionManager } from './session-state';
+import { MilestoneTracker } from './milestone-tracker';
+import { MilestoneNotifier } from './notifications/milestone-notifications';
+import { MilestoneAutomation } from './automation/milestone-automation';
+import { NexusBrain } from './nexus-brain';
+import { GitHooksManager } from './hooks/git-hooks';
+import { projectState } from './state/project-state';
 
-interface NexusCommand {
-  name: string;
-  description: string;
-  alias?: string;
-  action: (...args: any[]) => Promise<void>;
+interface CommandOptions {
+  force?: boolean;
+  debug?: boolean;
+  sync?: boolean;
 }
 
-interface NexusConfig {
-  commands: NexusCommand[];
-  hooks: string[];
-  automations: string[];
+class NexusManager {
+  private readonly dashboard: DevelopmentDashboard;
+  private readonly brain: NexusBrain;
+  private readonly hooks: GitHooksManager;
+  private readonly milestoneTracker: MilestoneTracker;
+  private readonly milestoneNotifier: MilestoneNotifier;
+  private readonly milestoneAutomation: MilestoneAutomation;
+
+  constructor() {
+    this.dashboard = new DevelopmentDashboard();
+    this.brain = new NexusBrain();
+    this.hooks = new GitHooksManager();
+    this.milestoneTracker = new MilestoneTracker();
+    this.milestoneNotifier = new MilestoneNotifier();
+    this.milestoneAutomation = new MilestoneAutomation();
+  }
+
+  async initialize(): Promise<void> {
+    try {
+      // Start state sync
+      stateSync.start();
+
+      // Initialize dashboard
+      await this.dashboard.initialize();
+
+      // Initialize git hooks
+      await this.hooks.initialize();
+
+      // Start milestone tracking
+      await this.milestoneTracker.start();
+      await this.milestoneNotifier.start();
+      await this.milestoneAutomation.start();
+
+      console.log(chalk.green('\n✨ Nexus initialized successfully\n'));
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red('\n❌ Failed to initialize Nexus:'), error.message);
+        process.exit(1);
+      }
+    }
+  }
+
+  async handleCommand(command: string, options: CommandOptions = {}): Promise<void> {
+    try {
+      const result = await this.brain.processCommand(command, options);
+      console.log(chalk.cyan('\n🤖 Nexus response:'), result);
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red('\n❌ Command failed:'), error.message);
+      }
+    }
+  }
 }
 
-function setupCommands() {
-  program
-    .name('nexus')
-    .description('Nexus Development Control Center')
-    .version('1.0.0');
+// Create Nexus instance
+const nexus = new NexusManager();
 
-  // Add brain command
-  program
-    .command('brain')
-    .alias('b')
-    .description('Run Nexus brain checks')
-    .action(async () => {
-      const brain = new NexusBrain();
-      await brain.checkAndRun();
-    });
+// Set up CLI
+const program = new Command();
 
-  // ... rest of the commands ...
-}
+program
+  .name('nexus')
+  .description('AI-powered development assistant')
+  .version('1.0.0');
 
-// Set up commands and parse arguments
-setupCommands();
-program.parse(process.argv);
+program
+  .command('init')
+  .description('Initialize Nexus')
+  .action(async () => {
+    await nexus.initialize();
+  });
 
-module.exports = {
-  setupCommands
-}; 
+program
+  .command('run <command>')
+  .description('Execute a Nexus command')
+  .option('-f, --force', 'Force execution')
+  .option('-d, --debug', 'Enable debug mode')
+  .option('-s, --sync', 'Sync state after execution')
+  .action(async (command: string, options: CommandOptions) => {
+    await nexus.handleCommand(command, options);
+  });
+
+// Parse command line arguments
+program.parse(process.argv); 

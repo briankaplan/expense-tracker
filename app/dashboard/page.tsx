@@ -1,10 +1,15 @@
-import { DashboardView } from '@/components/views/dashboard/DashboardView';
+'use client';
 
-export const metadata = {
-  title: 'Dashboard | Expense Manager',
-  description: 'Overview of your expenses and recent activity',
-};
+import { DashboardView } from '@/components/views/dashboard/DashboardView';
+import { useExpenses } from '@/lib/hooks/useExpenses';
 
 export default function DashboardPage() {
-  return <DashboardView />;
+  const { expenses } = useExpenses();
+
+  return (
+    <div className="container mx-auto py-6">
+      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      <DashboardView expenses={expenses} />
+    </div>
+  );
 } 

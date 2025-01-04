@@ -7,11 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/Dialog';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { DatePicker } from '@/components/ui/DatePicker';
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { DatePicker } from '@/components/ui/date-picker';
+import type { Expense } from '@/types';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 interface AddExpenseDialogProps {
   open: boolean;
@@ -21,9 +23,9 @@ interface AddExpenseDialogProps {
     description: string;
     amount: number;
     category: string;
-    type?: 'business' | 'personal';
+    type: 'business' | 'personal';
     memo?: string;
-  }) => void;
+  }) => Promise<void>;
 }
 
 export function AddExpenseDialog({
@@ -35,17 +37,19 @@ export function AddExpenseDialog({
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
+  const [type, setType] = useState<'business' | 'personal'>('business');
   const [memo, setMemo] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!date || !description || !amount) return;
 
-    onSubmit({
+    await onSubmit({
       date: date.toISOString(),
       description,
       amount: parseFloat(amount),
       category,
+      type,
       memo
     });
 
@@ -54,6 +58,7 @@ export function AddExpenseDialog({
     setDescription('');
     setAmount('');
     setCategory('');
+    setType('business');
     setMemo('');
   };
 
@@ -98,6 +103,21 @@ export function AddExpenseDialog({
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="type">Type</Label>
+            <Select 
+              value={type} 
+              onValueChange={(value) => setType(value as 'business' | 'personal')}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="business">Business</SelectItem>
+                <SelectItem value="personal">Personal</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="memo">Memo</Label>
