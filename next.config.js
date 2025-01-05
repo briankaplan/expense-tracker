@@ -4,10 +4,7 @@ const nextConfig = {
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // Add any custom webpack configuration here
     return config;
-  },
-  experimental: {
-    appDir: true,
-  },
+  }
 }
 
 module.exports = nextConfig; 

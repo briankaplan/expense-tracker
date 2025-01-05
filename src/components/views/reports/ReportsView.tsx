@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ReportList } from './ReportList';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { Eye, EyeOff } from 'lucide-react';
 
 type ReportType = 'business' | 'personal';

@@ -1,6 +1,6 @@
 import { useNexus } from '@/contexts/NexusContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Progress } from '@/components/ui/Progress';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
 export function ScriptManager() {
   const { state } = useNexus();

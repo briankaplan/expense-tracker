@@ -1,9 +1,10 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
+import { AlertCircle, ChevronRight, FileText, Receipt } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface ReportCardProps {
   id: string;
@@ -30,56 +31,63 @@ export function ReportCard({
   dateClosed,
   onOpen
 }: ReportCardProps) {
+  const formattedDate = format(new Date(dateCreated), 'MMM d, yyyy');
+  const formattedClosedDate = dateClosed ? format(new Date(dateClosed), 'MMM d, yyyy') : null;
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">
-          Report #{id}
-        </CardTitle>
-        <Badge
-          variant={status === 'open' ? 'default' : 'secondary'}
-        >
-          {status}
-        </Badge>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-2">
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Total Amount</span>
-            <span className="font-medium">{formatCurrency(totalAmount)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Expenses</span>
-            <span className="font-medium">{expenseCount}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Missing Receipts</span>
-            <span className="font-medium">{missingReceipts}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Missing Comments</span>
-            <span className="font-medium">{missingComments}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Created</span>
-            <span className="font-medium">{new Date(dateCreated).toLocaleDateString()}</span>
-          </div>
-          {dateClosed && (
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Closed</span>
-              <span className="font-medium">{new Date(dateClosed).toLocaleDateString()}</span>
+    <Card className="p-6 hover:bg-accent/5 transition-colors cursor-pointer" onClick={() => onOpen(id)}>
+      <div className="flex items-start justify-between">
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold">Report #{id}</h3>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                status === 'open' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+              }`}>
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+              </span>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                type === 'business' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+              }`}>
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </span>
             </div>
-          )}
-          {status === 'open' && (
-            <Button
-              className="mt-4"
-              onClick={() => onOpen(id)}
-            >
-              Open Report
-            </Button>
-          )}
+            <p className="text-sm text-muted-foreground mt-1">
+              Created {formattedDate}
+              {formattedClosedDate && ` • Closed ${formattedClosedDate}`}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Total Amount</div>
+              <div className="text-lg font-semibold">{formatCurrency(totalAmount)}</div>
+            </div>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Expenses</div>
+              <div className="text-lg font-semibold">{expenseCount}</div>
+            </div>
+            {(missingReceipts > 0 || missingComments > 0) && (
+              <div className="col-span-2 flex items-center gap-4">
+                {missingReceipts > 0 && (
+                  <div className="flex items-center gap-1 text-amber-600">
+                    <Receipt className="h-4 w-4" />
+                    <span className="text-sm">{missingReceipts} missing receipts</span>
+                  </div>
+                )}
+                {missingComments > 0 && (
+                  <div className="flex items-center gap-1 text-amber-600">
+                    <FileText className="h-4 w-4" />
+                    <span className="text-sm">{missingComments} missing comments</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </CardContent>
+
+        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+      </div>
     </Card>
   );
 } 

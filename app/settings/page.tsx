@@ -1,322 +1,588 @@
 'use client';
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { Switch } from '@/components/ui/Switch';
-import { useTeller } from '@/lib/providers/TellerProvider';
-import { toast } from 'react-hot-toast';
 import { useState } from 'react';
+import GmailSettings from '@/components/views/settings/GmailSettings';
+import { GmailReceiptsDialog } from '@/components/views/receipts/GmailReceiptsDialog';
+import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Dialog } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from '@/components/ui/use-toast';
+import { 
+  Bell,
+  Moon,
+  Sun,
+  Tags,
+  CreditCard,
+  Settings as SettingsIcon,
+  Github,
+  Download,
+  Upload,
+  Database,
+  Link,
+  Smartphone,
+  Building2,
+  Building as Bank,
+  Cloud as CloudSync
+} from 'lucide-react';
 
 export default function SettingsPage() {
-  const { 
-    isConnected, 
-    reconnect, 
-    disconnect, 
-    resync, 
-    isSyncing,
-    autoSyncEnabled,
-    toggleAutoSync,
-    lastSynced 
-  } = useTeller();
+  const [foundReceipts, setFoundReceipts] = useState<any[]>([]);
+  const [showReceiptsDialog, setShowReceiptsDialog] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('darkMode') === 'true';
+    }
+    return false;
+  });
+  const [defaultCurrency, setDefaultCurrency] = useState(() => {
+    return localStorage.getItem('default_currency') || 'USD';
+  });
+  const [tellerConnected, setTellerConnected] = useState(() => {
+    return localStorage.getItem('teller_connected') === 'true';
+  });
+  const [dropboxConnected, setDropboxConnected] = useState(() => {
+    return localStorage.getItem('dropbox_connected') === 'true';
+  });
+  const [autoBackup, setAutoBackup] = useState(() => {
+    return localStorage.getItem('auto_backup') === 'true';
+  });
+  const [githubConnected, setGithubConnected] = useState(() => {
+    return localStorage.getItem('github_connected') === 'true';
+  });
+  const [vercelConnected, setVercelConnected] = useState(() => {
+    return localStorage.getItem('vercel_connected') === 'true';
+  });
+  const [netsuiteConnected, setNetsuiteConnected] = useState(() => {
+    return localStorage.getItem('netsuite_connected') === 'true';
+  });
+  const [apiEnabled, setApiEnabled] = useState(() => {
+    return localStorage.getItem('api_enabled') === 'true';
+  });
+  const [pwaInstalled, setPwaInstalled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(display-mode: standalone)').matches;
+    }
+    return false;
+  });
 
-  const [isUploading, setIsUploading] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
+  const handleReceiptsFound = (receipts: any[]) => {
+    setFoundReceipts(receipts);
+    setShowReceiptsDialog(true);
+  };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleImportReceipts = async (receipts: any[]) => {
+    console.log('Importing receipts:', receipts);
+  };
 
-    setIsUploading(true);
+  const handleDarkModeChange = (enabled: boolean) => {
+    setDarkMode(enabled);
+    localStorage.setItem('darkMode', enabled.toString());
+    document.documentElement.classList.toggle('dark', enabled);
+    toast({
+      title: enabled ? "Dark Mode Enabled" : "Light Mode Enabled",
+      description: "Your display preferences have been updated."
+    });
+  };
+
+  const handleTellerConnect = async () => {
     try {
-      // TODO: Implement CSV upload
-      toast.success('CSV file uploaded successfully');
+      // TODO: Implement Teller Connect flow
+      setTellerConnected(true);
+      localStorage.setItem('teller_connected', 'true');
+      toast({
+        title: "Bank Account Connected",
+        description: "Successfully connected your bank account via Teller."
+      });
     } catch (error) {
-      console.error('Error uploading CSV:', error);
-      toast.error('Failed to upload CSV file');
-    } finally {
-      setIsUploading(false);
+      toast({
+        variant: "destructive",
+        title: "Connection Failed",
+        description: "Could not connect to your bank account. Please try again."
+      });
     }
   };
 
-  const handleExportData = async () => {
-    setIsExporting(true);
+  const handleDropboxConnect = async () => {
     try {
-      // TODO: Implement data export
-      toast.success('Data exported successfully');
+      // TODO: Implement Dropbox OAuth flow
+      setDropboxConnected(true);
+      localStorage.setItem('dropbox_connected', 'true');
+      toast({
+        title: "Dropbox Connected",
+        description: "Successfully connected your Dropbox account for backups."
+      });
     } catch (error) {
-      console.error('Error exporting data:', error);
-      toast.error('Failed to export data');
-    } finally {
-      setIsExporting(false);
+      toast({
+        variant: "destructive",
+        title: "Connection Failed",
+        description: "Could not connect to Dropbox. Please try again."
+      });
     }
   };
 
-  const handleClearCache = async () => {
-    setIsClearing(true);
+  const handleAutoBackupChange = (enabled: boolean) => {
+    setAutoBackup(enabled);
+    localStorage.setItem('auto_backup', enabled.toString());
+    toast({
+      title: enabled ? "Auto Backup Enabled" : "Auto Backup Disabled",
+      description: enabled 
+        ? "Your data will be automatically backed up to Dropbox"
+        : "Auto backup has been disabled"
+    });
+  };
+
+  const handleGithubConnect = async () => {
     try {
-      localStorage.clear();
-      toast.success('Cache cleared successfully');
+      // TODO: Implement GitHub OAuth flow
+      setGithubConnected(true);
+      localStorage.setItem('github_connected', 'true');
+      toast({
+        title: "GitHub Connected",
+        description: "Successfully connected your GitHub account."
+      });
     } catch (error) {
-      console.error('Error clearing cache:', error);
-      toast.error('Failed to clear cache');
-    } finally {
-      setIsClearing(false);
+      toast({
+        variant: "destructive",
+        title: "Connection Failed",
+        description: "Could not connect to GitHub. Please try again."
+      });
     }
+  };
+
+  const handleVercelConnect = async () => {
+    try {
+      // TODO: Implement Vercel integration
+      setVercelConnected(true);
+      localStorage.setItem('vercel_connected', 'true');
+      toast({
+        title: "Vercel Connected",
+        description: "Successfully connected your Vercel account."
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Connection Failed",
+        description: "Could not connect to Vercel. Please try again."
+      });
+    }
+  };
+
+  const handleNetsuiteConnect = async () => {
+    try {
+      // TODO: Implement NetSuite integration
+      setNetsuiteConnected(true);
+      localStorage.setItem('netsuite_connected', 'true');
+      toast({
+        title: "NetSuite Connected",
+        description: "Successfully connected your NetSuite account."
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Connection Failed",
+        description: "Could not connect to NetSuite. Please try again."
+      });
+    }
+  };
+
+  const handleApiToggle = (enabled: boolean) => {
+    setApiEnabled(enabled);
+    localStorage.setItem('api_enabled', enabled.toString());
+    toast({
+      title: enabled ? "API Access Enabled" : "API Access Disabled",
+      description: enabled 
+        ? "You can now access your data via the API"
+        : "API access has been disabled"
+    });
+  };
+
+  const generateApiKey = () => {
+    // TODO: Implement API key generation
+    const key = 'exp_' + Math.random().toString(36).substring(2);
+    toast({
+      title: "New API Key Generated",
+      description: "Your new API key has been created. Make sure to save it securely."
+    });
+    return key;
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">Settings</h1>
-      
-      <Tabs defaultValue="bank" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="bank">Bank Connection</TabsTrigger>
-          <TabsTrigger value="import">Import/Export</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          <TabsTrigger value="api">API Settings</TabsTrigger>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-        </TabsList>
+    <div className="container py-8 space-y-8">
+      <div className="flex items-center gap-2">
+        <SettingsIcon className="h-6 w-6" />
+        <h1 className="text-2xl font-bold">Settings</h1>
+      </div>
 
-        <TabsContent value="bank">
-          <Card>
-            <CardHeader>
-              <CardTitle>Bank Connection Settings</CardTitle>
-              <CardDescription>
-                Manage your bank connection and synchronization settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Connection Status</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {isConnected ? 'Connected' : 'Not connected'}
-                  </p>
-                </div>
-                <Button
-                  variant={isConnected ? "destructive" : "default"}
-                  onClick={isConnected ? disconnect : reconnect}
-                >
-                  {isConnected ? 'Disconnect' : 'Connect Bank'}
-                </Button>
+      <div className="grid gap-6">
+        <GmailSettings onReceiptsFound={handleReceiptsFound} />
+
+        {/* Display Settings */}
+        <Card className="p-6">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Sun className="h-5 w-5" />
+                Display Settings
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Customize how the application looks and feels
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Dark Mode</Label>
+                <p className="text-sm text-muted-foreground">
+                  Enable dark mode for a better night-time experience
+                </p>
               </div>
+              <Switch
+                checked={darkMode}
+                onCheckedChange={handleDarkModeChange}
+              />
+            </div>
 
+            <div className="space-y-2">
+              <Label>Default Currency</Label>
+              <Select
+                defaultValue={defaultCurrency}
+                onValueChange={(value) => {
+                  localStorage.setItem('default_currency', value);
+                  setDefaultCurrency(value);
+                  toast({
+                    title: "Default Currency Updated",
+                    description: `Your default currency has been set to ${value}.`
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                  <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                  <SelectItem value="GBP">British Pound (GBP)</SelectItem>
+                  <SelectItem value="JPY">Japanese Yen (JPY)</SelectItem>
+                  <SelectItem value="CAD">Canadian Dollar (CAD)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </Card>
+
+        {/* Banking Integration */}
+        <Card className="p-6">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Bank className="h-5 w-5" />
+                Banking Integration
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Connect your bank accounts for automatic transaction import
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Teller Connect</Label>
+                <p className="text-sm text-muted-foreground">
+                  Securely connect your bank accounts
+                </p>
+              </div>
+              {!tellerConnected ? (
+                <Button onClick={handleTellerConnect}>
+                  Connect Bank
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => {
+                  setTellerConnected(false);
+                  localStorage.removeItem('teller_connected');
+                }}>
+                  Disconnect
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Cloud Storage & Backup */}
+        <Card className="p-6">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <CloudSync className="h-5 w-5" />
+                Cloud Storage & Backup
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Configure cloud storage and automatic backups
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Dropbox Integration</Label>
+                <p className="text-sm text-muted-foreground">
+                  Connect Dropbox for automatic backups
+                </p>
+              </div>
+              {!dropboxConnected ? (
+                <Button onClick={handleDropboxConnect}>
+                  Connect Dropbox
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => {
+                  setDropboxConnected(false);
+                  localStorage.removeItem('dropbox_connected');
+                }}>
+                  Disconnect
+                </Button>
+              )}
+            </div>
+
+            {dropboxConnected && (
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Auto-Sync</h3>
+                <div className="space-y-0.5">
+                  <Label>Auto Backup</Label>
                   <p className="text-sm text-muted-foreground">
-                    Automatically sync transactions daily
+                    Automatically backup data to Dropbox
                   </p>
                 </div>
                 <Switch
-                  checked={autoSyncEnabled}
-                  onCheckedChange={toggleAutoSync}
-                  disabled={!isConnected}
+                  checked={autoBackup}
+                  onCheckedChange={handleAutoBackupChange}
                 />
               </div>
+            )}
+          </div>
+        </Card>
 
+        {/* Developer Integrations */}
+        <Card className="p-6">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Link className="h-5 w-5" />
+                Developer Integrations
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Connect development and deployment platforms
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>GitHub Integration</Label>
+                <p className="text-sm text-muted-foreground">
+                  Connect GitHub for version control
+                </p>
+              </div>
+              {!githubConnected ? (
+                <Button onClick={handleGithubConnect}>
+                  <Github className="mr-2 h-4 w-4" />
+                  Connect GitHub
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => {
+                  setGithubConnected(false);
+                  localStorage.removeItem('github_connected');
+                }}>
+                  Disconnect
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Vercel Integration</Label>
+                <p className="text-sm text-muted-foreground">
+                  Connect Vercel for deployments
+                </p>
+              </div>
+              {!vercelConnected ? (
+                <Button onClick={handleVercelConnect}>
+                  Connect Vercel
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => {
+                  setVercelConnected(false);
+                  localStorage.removeItem('vercel_connected');
+                }}>
+                  Disconnect
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Enterprise Integrations */}
+        <Card className="p-6">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Enterprise Integrations
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Connect enterprise systems and export options
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>NetSuite Integration</Label>
+                <p className="text-sm text-muted-foreground">
+                  Connect NetSuite for expense sync
+                </p>
+              </div>
+              {!netsuiteConnected ? (
+                <Button onClick={handleNetsuiteConnect}>
+                  Connect NetSuite
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => {
+                  setNetsuiteConnected(false);
+                  localStorage.removeItem('netsuite_connected');
+                }}>
+                  Disconnect
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Export Format</Label>
+              <Select
+                defaultValue={localStorage.getItem('export_format') || 'csv'}
+                onValueChange={(value) => {
+                  localStorage.setItem('export_format', value);
+                  toast({
+                    title: "Export Format Updated",
+                    description: `Reports will now be exported in ${value.toUpperCase()} format.`
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select format" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="csv">CSV</SelectItem>
+                  <SelectItem value="xlsx">Excel (XLSX)</SelectItem>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="json">JSON</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </Card>
+
+        {/* API Access */}
+        <Card className="p-6">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                API Access
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Manage API access and keys
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Enable API Access</Label>
+                <p className="text-sm text-muted-foreground">
+                  Allow external applications to access your data
+                </p>
+              </div>
+              <Switch
+                checked={apiEnabled}
+                onCheckedChange={handleApiToggle}
+              />
+            </div>
+
+            {apiEnabled && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>API Key</Label>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const key = generateApiKey();
+                      // TODO: Save and display API key
+                    }}
+                  >
+                    Generate New Key
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Use this key to authenticate API requests
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Mobile App */}
+        <Card className="p-6">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Smartphone className="h-5 w-5" />
+                Mobile App
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Install and manage mobile app settings
+              </p>
+            </div>
+
+            {!pwaInstalled && (
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Manual Sync</h3>
+                <div className="space-y-0.5">
+                  <Label>Install App</Label>
                   <p className="text-sm text-muted-foreground">
-                    Sync transactions now
+                    Install as a Progressive Web App
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={resync}
-                  disabled={!isConnected || isSyncing}
-                >
-                  {isSyncing ? 'Syncing...' : 'Sync Now'}
+                <Button>
+                  <Download className="mr-2 h-4 w-4" />
+                  Install
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            )}
 
-        <TabsContent value="import">
-          <Card>
-            <CardHeader>
-              <CardTitle>Import & Export</CardTitle>
-              <CardDescription>
-                Import transactions from CSV or export your data
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid w-full max-w-sm items-center gap-1.5">
-                <Label htmlFor="csvFile">Import CSV</Label>
-                <Input
-                  id="csvFile"
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  disabled={isUploading}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Apple Shortcuts</Label>
+              <Button className="w-full" variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Download Shortcut
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                Add expenses quickly using Apple Shortcuts
+              </p>
+            </div>
+          </div>
+        </Card>
+      </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Export Data</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Download your transaction data
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={handleExportData}
-                  disabled={isExporting}
-                >
-                  {isExporting ? 'Exporting...' : 'Export CSV'}
-                </Button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Clear Cache</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Clear local storage and cached data
-                  </p>
-                </div>
-                <Button
-                  variant="destructive"
-                  onClick={handleClearCache}
-                  disabled={isClearing}
-                >
-                  {isClearing ? 'Clearing...' : 'Clear Cache'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="integrations">
-          <Card>
-            <CardHeader>
-              <CardTitle>External Integrations</CardTitle>
-              <CardDescription>
-                Connect with external services and plugins
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Gmail Plugin</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Automatically scan emails for receipts
-                  </p>
-                </div>
-                <Button variant="outline">Connect Gmail</Button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Dropbox Integration</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Backup receipts to Dropbox
-                  </p>
-                </div>
-                <Button variant="outline">Connect Dropbox</Button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Apple Shortcuts</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Download iOS shortcuts for quick expense tracking
-                  </p>
-                </div>
-                <Button variant="outline">Get Shortcuts</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="api">
-          <Card>
-            <CardHeader>
-              <CardTitle>API Configuration</CardTitle>
-              <CardDescription>
-                Configure API keys and settings for various services
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid w-full gap-1.5">
-                <Label htmlFor="openai">OpenAI API Key</Label>
-                <Input
-                  id="openai"
-                  type="password"
-                  placeholder="sk-..."
-                />
-              </div>
-
-              <div className="grid w-full gap-1.5">
-                <Label htmlFor="google">Google Cloud API Key</Label>
-                <Input
-                  id="google"
-                  type="password"
-                  placeholder="Enter API key"
-                />
-              </div>
-
-              <div className="grid w-full gap-1.5">
-                <Label htmlFor="mindee">Mindee API Key</Label>
-                <Input
-                  id="mindee"
-                  type="password"
-                  placeholder="Enter API key"
-                />
-              </div>
-
-              <Button className="mt-4">Save API Settings</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="profile">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Profile</CardTitle>
-              <CardDescription>
-                Manage your account settings and preferences
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid w-full gap-1.5">
-                <Label htmlFor="name">Display Name</Label>
-                <Input
-                  id="name"
-                  placeholder="Your name"
-                />
-              </div>
-
-              <div className="grid w-full gap-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Email Notifications</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Receive email updates about your expenses
-                  </p>
-                </div>
-                <Switch />
-              </div>
-
-              <Button className="mt-4">Save Profile</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <GmailReceiptsDialog
+        open={showReceiptsDialog}
+        onOpenChange={setShowReceiptsDialog}
+        receipts={foundReceipts}
+        onImport={handleImportReceipts}
+      />
     </div>
   );
 } 

@@ -1,0 +1,342 @@
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { execSync } from 'child_process';
+import dotenv from 'dotenv';
+import chalk from 'chalk';
+
+dotenv.config();
+
+// --- CONFIGURATION ---
+const ALLOWED_DIRS = [
+  './src',
+  './app',
+  './config',
+  './scripts',
+  './components',
+  './.git',
+  './.next',
+  './.husky',
+  './node_modules',
+  './public',
+  './logs',
+  './backups',
+  './.nexus',
+  './.github',
+  './docs',
+  './downloads',
+  './recovery',
+  './templates',
+  './types',
+  './lib',
+];
+const PROTECTED_FILES = ['.env', './nexus_guard.ts', './config/teller.ts'];
+const BACKUP_FOLDER = './backups';
+const LOG_FILE = './logs/ai_changes.log';
+const CHECKSUM_FILE = './checksums.json';
+const ENFORCE_MODE = true; // Enable strict enforcement
+
+// --- CODE VERIFICATION CONFIG ---
+const CODE_VERIFICATION = {
+  typescript: {
+    extensions: ['.ts', '.tsx'],
+    verify: 'tsc --noEmit',
+    fix: 'eslint --fix',
+  },
+  javascript: {
+    extensions: ['.js', '.jsx'],
+    verify: 'eslint',
+    fix: 'eslint --fix',
+  },
+  prettier: {
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json', '.md'],
+    verify: 'prettier --check',
+    fix: 'prettier --write',
+  },
+};
+
+// --- UTILITY FUNCTIONS ---
+const log = (msg: string, type: 'success' | 'error' | 'info' | 'warning') => {
+  const colors = {
+    success: chalk.green,
+    error: chalk.red,
+    info: chalk.blue,
+    warning: chalk.yellow,
+  };
+  console.log(colors[type](`[${type.toUpperCase()}] ${msg}`));
+};
+
+const getChecksum = (file: string): string => {
+  const data = fs.readFileSync(file, 'utf8');
+  return crypto.createHash('sha256').update(data).digest('hex');
+};
+
+const saveChecksums = (checksums: Record<string, string>) => {
+  fs.writeFileSync(CHECKSUM_FILE, JSON.stringify(checksums, null, 2));
+  log('Checksums updated.', 'info');
+};
+
+// --- VERIFY DIRECTORY STRUCTURE ---
+const validateStructure = () => {
+  log('Validating folder structure...', 'info');
+  const allowed = new Set(ALLOWED_DIRS.map((dir) => path.normalize(dir)));
+
+  fs.readdirSync('.').forEach((item) => {
+    const itemPath = path.normalize(`./${item}`);
+    if (fs.statSync(itemPath).isDirectory() && !allowed.has(itemPath)) {
+      log(`Unauthorized folder detected: ${itemPath}`, 'error');
+      if (ENFORCE_MODE) process.exit(1);
+    }
+  });
+
+  log('Folder structure validated.', 'success');
+};
+
+// --- BACKUP FILES ---
+const backupFiles = () => {
+  log('Backing up critical files...', 'info');
+  if (!fs.existsSync(BACKUP_FOLDER)) fs.mkdirSync(BACKUP_FOLDER);
+
+  PROTECTED_FILES.forEach((file) => {
+    if (fs.existsSync(file)) {
+      const backupPath = path.join(BACKUP_FOLDER, path.basename(file));
+      fs.copyFileSync(file, `${backupPath}.backup`);
+      log(`Backup created for ${file}`, 'success');
+    } else {
+      log(`Protected file not found: ${file}`, 'warning');
+    }
+  });
+};
+
+// --- CHECKSUM VALIDATION ---
+const validateChecksums = () => {
+  log('Validating checksums...', 'info');
+  let checksums: Record<string, string> = {};
+
+  if (fs.existsSync(CHECKSUM_FILE)) {
+    checksums = JSON.parse(fs.readFileSync(CHECKSUM_FILE, 'utf8'));
+  }
+
+  let valid = true;
+  PROTECTED_FILES.forEach((file) => {
+    if (!fs.existsSync(file)) {
+      log(`Protected file not found: ${file}`, 'warning');
+      return;
+    }
+
+    const checksum = getChecksum(file);
+    if (checksums[file] && checksums[file] !== checksum) {
+      log(`File tampered: ${file}`, 'error');
+      if (ENFORCE_MODE) {
+        const backup = `${BACKUP_FOLDER}/${path.basename(file)}.backup`;
+        if (fs.existsSync(backup)) {
+          fs.copyFileSync(backup, file);
+          log(`Restored ${file} from backup.`, 'success');
+        } else {
+          log(`No backup found for ${file}`, 'error');
+        }
+      }
+      valid = false;
+    }
+    checksums[file] = checksum; // Update checksum
+  });
+
+  fs.writeFileSync(CHECKSUM_FILE, JSON.stringify(checksums, null, 2));
+  if (!valid && ENFORCE_MODE) process.exit(1);
+};
+
+// --- AI WRITE BLOCKER ---
+const monitorWrites = () => {
+  const originalWrite = fs.writeFileSync;
+  fs.writeFileSync = (file, data, options) => {
+    const normalizedPath = path.normalize(file.toString());
+    if (!ALLOWED_DIRS.some((dir) => normalizedPath.startsWith(dir))) {
+      const logEntry = `${new Date().toISOString()} - BLOCKED AI WRITE: ${normalizedPath}\n`;
+      fs.appendFileSync(LOG_FILE, logEntry);
+      log(`Blocked AI write: ${normalizedPath}`, 'error');
+      if (ENFORCE_MODE) process.exit(1);
+    }
+    originalWrite(file, data, options);
+  };
+};
+
+// --- GIT BACKUP ---
+const gitBackup = () => {
+  try {
+    execSync('git add .');
+    execSync(`git commit -m "Nexus Auto Backup"`);
+    execSync('git push origin main');
+    log('Git backup completed.', 'success');
+  } catch (err) {
+    if (err instanceof Error) {
+      log(`Git backup failed: ${err.message}`, 'error');
+    } else {
+      log('Git backup failed with an unknown error.', 'error');
+    }
+  }
+};
+
+// --- PROTECT NEXUS FILE ---
+const protectNexus = () => {
+  const nexusFile = './nexus_guard.ts';
+  const backupFile = `${BACKUP_FOLDER}/nexus_guard.ts.backup`;
+
+  if (getChecksum(nexusFile) !== getChecksum(backupFile)) {
+    log('Nexus script modified!', 'error');
+    fs.copyFileSync(backupFile, nexusFile);
+    log('Restored Nexus script.', 'success');
+  }
+};
+
+// --- AUTO VERIFICATION AND FIX ---
+const verifyAndFixFile = (filePath: string) => {
+  if (!fs.existsSync(filePath)) {
+    log(`File not found: ${filePath}`, 'warning');
+    const backupPath = path.join(BACKUP_FOLDER, path.basename(filePath) + '.backup');
+    if (fs.existsSync(backupPath)) {
+      fs.copyFileSync(backupPath, filePath);
+      log(`Restored ${filePath} from backup`, 'success');
+      return true;
+    }
+    return false;
+  }
+
+  const currentChecksum = getChecksum(filePath);
+  const backupPath = path.join(BACKUP_FOLDER, path.basename(filePath) + '.backup');
+
+  if (!fs.existsSync(backupPath)) {
+    log(`Creating first backup for ${filePath}`, 'info');
+    fs.copyFileSync(filePath, backupPath);
+    return true;
+  }
+
+  const backupChecksum = getChecksum(backupPath);
+  if (currentChecksum !== backupChecksum) {
+    log(`File ${filePath} has been modified`, 'warning');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const modifiedBackup = `${backupPath}.${timestamp}`;
+    fs.copyFileSync(filePath, modifiedBackup);
+    log(`Saved modified version to ${modifiedBackup}`, 'info');
+    fs.copyFileSync(backupPath, filePath);
+    log(`Restored original version of ${filePath}`, 'success');
+    return true;
+  }
+
+  return false;
+};
+
+const autoVerifyAndFix = () => {
+  log('Starting auto verification and fix...', 'info');
+  let fixedFiles = 0;
+
+  PROTECTED_FILES.forEach((file) => {
+    if (verifyAndFixFile(file)) {
+      fixedFiles++;
+    }
+  });
+
+  if (fixedFiles > 0) {
+    log(`Fixed ${fixedFiles} file(s)`, 'success');
+  } else {
+    log('All files are in their original state', 'success');
+  }
+};
+
+// --- CODE VERIFICATION AND FIX ---
+const verifyAndFixCode = (filePath: string) => {
+  const ext = path.extname(filePath);
+  let fixed = false;
+
+  // Find applicable verifications
+  Object.entries(CODE_VERIFICATION).forEach(([tool, config]) => {
+    if (config.extensions.includes(ext)) {
+      try {
+        // Try verification
+        execSync(`${config.verify} "${filePath}"`, { stdio: 'pipe' });
+        log(`${tool} verification passed for ${filePath}`, 'success');
+      } catch (err) {
+        log(`${tool} issues found in ${filePath}, attempting to fix...`, 'warning');
+        try {
+          // Attempt to fix
+          execSync(`${config.fix} "${filePath}"`, { stdio: 'pipe' });
+          log(`${tool} auto-fixed ${filePath}`, 'success');
+          fixed = true;
+        } catch (fixErr) {
+          log(`Failed to auto-fix ${tool} issues in ${filePath}`, 'error');
+        }
+      }
+    }
+  });
+
+  return fixed;
+};
+
+const verifyAllCode = () => {
+  log('Starting code verification...', 'info');
+  let fixedFiles = 0;
+  let totalFiles = 0;
+
+  // Get all code files
+  const getAllFiles = (dir: string): string[] => {
+    const files: string[] = [];
+    const items = fs.readdirSync(dir);
+
+    items.forEach((item) => {
+      const fullPath = path.join(dir, item);
+      if (fs.statSync(fullPath).isDirectory()) {
+        if (!item.startsWith('.') && item !== 'node_modules') {
+          files.push(...getAllFiles(fullPath));
+        }
+      } else {
+        const ext = path.extname(fullPath);
+        if (Object.values(CODE_VERIFICATION).some((config) => config.extensions.includes(ext))) {
+          files.push(fullPath);
+        }
+      }
+    });
+
+    return files;
+  };
+
+  const codeFiles = getAllFiles('.');
+  totalFiles = codeFiles.length;
+
+  codeFiles.forEach((file) => {
+    if (verifyAndFixCode(file)) {
+      fixedFiles++;
+    }
+  });
+
+  log(`Verified ${totalFiles} files, fixed ${fixedFiles} files`, 'info');
+  return fixedFiles > 0;
+};
+
+// --- MAIN EXECUTION ---
+const runNexus = () => {
+  log('Starting Nexus Guardian...', 'info');
+
+  // Ensure backup and logs folders exist
+  if (!fs.existsSync(BACKUP_FOLDER)) fs.mkdirSync(BACKUP_FOLDER);
+  if (!fs.existsSync('./logs')) fs.mkdirSync('./logs');
+
+  backupFiles();
+  autoVerifyAndFix();
+  protectNexus();
+  validateStructure();
+  validateChecksums();
+
+  // Add code verification step
+  const codeFixed = verifyAllCode();
+  if (codeFixed) {
+    log('Code issues were fixed, creating backup...', 'info');
+    backupFiles(); // Create new backup after fixes
+  }
+
+  monitorWrites();
+  gitBackup();
+
+  log('Nexus Guardian completed successfully.', 'success');
+};
+
+// Execute the Guardian
+runNexus();

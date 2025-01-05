@@ -1,4 +1,5 @@
 import { ReportsProvider } from '@/contexts/ReportsContext';
+import { Providers } from '@/components/Providers';
 
 export default function ReportsLayout({
   children,
@@ -6,8 +7,10 @@ export default function ReportsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ReportsProvider>
-      {children}
-    </ReportsProvider>
+    <Providers>
+      <ReportsProvider>
+        {children}
+      </ReportsProvider>
+    </Providers>
   );
 } 

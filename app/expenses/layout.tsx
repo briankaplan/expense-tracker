@@ -2,7 +2,7 @@ import { type Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Expenses',
-  description: 'Manage and track your expenses'
+  description: 'Track and manage your expenses'
 };
 
 export default function ExpensesLayout({

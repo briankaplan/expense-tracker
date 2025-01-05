@@ -1,23 +1,27 @@
 'use client';
 
-import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
-import { UserNav } from './UserNav';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { Button } from '@/components/ui/button';
+import { Menu } from 'lucide-react';
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick: () => void;
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="flex flex-1 items-center justify-between space-x-4">
-          <Link href="/" className="font-semibold">
-            Expense Manager
-          </Link>
-          <nav className="flex items-center space-x-4">
-            <ThemeToggle />
-            <UserNav />
-          </nav>
-        </div>
+    <header className="sticky top-0 z-40 border-b bg-background">
+      <div className="flex h-14 items-center gap-4 px-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={onMenuClick}
+        >
+          <Menu className="h-4 w-4" />
+        </Button>
+        <div className="flex-1" />
+        <ThemeToggle />
       </div>
     </header>
   );

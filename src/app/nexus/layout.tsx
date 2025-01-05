@@ -5,9 +5,5 @@ export default function NexusLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <AppShell>{children}</AppShell>
-    </div>
-  );
+  return <AppShell>{children}</AppShell>;
 } 
