@@ -1,30 +1,11 @@
 export interface Receipt {
   id: string;
   url: string;
-  filename: string;
-  uploadedAt: string;
-  size: number;
-  type: string;
-  expenseId?: string;
+  date: string;
+  merchant?: string;
+  total?: number;
   status: 'pending' | 'matched' | 'unmatched';
-  metadata?: {
-    width?: number;
-    height?: number;
-    ocr?: {
-      text: string;
-      confidence: number;
-    };
-    merchant?: {
-      name: string;
-      confidence: number;
-    };
-    amount?: {
-      value: number;
-      confidence: number;
-    };
-    date?: {
-      value: string;
-      confidence: number;
-    };
-  };
+  expenseId?: string;
+  createdAt: string;
+  updatedAt: string;
 } 

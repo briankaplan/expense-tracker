@@ -1,13 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverActions: {
-      allowedOrigins: ['localhost:*']
-    }
-  },
   images: {
     domains: ['cdn4.iconfinder.com'],
   },
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['localhost:3000', 'localhost:3001'],
+    },
+  },
 };
 
-module.exports = nextConfig; 
+module.exports = nextConfig;

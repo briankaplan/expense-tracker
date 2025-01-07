@@ -1,91 +1,173 @@
 'use client';
 
-import { SubscriptionView } from '@/components/views/subscriptions/SubscriptionView';
-import { useCallback } from 'react';
-import { toast } from 'react-hot-toast';
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { PlusIcon } from '@radix-ui/react-icons';
+import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
-// TODO: Replace with actual data fetching and AI processing
-const mockSubscriptions = [
+interface Subscription {
+  name: string;
+  color: string;
+  enabled: boolean;
+  description: string;
+  amount: number;
+  billingCycle: 'monthly' | 'yearly';
+  nextBillingDate: Date;
+  status: 'active' | 'inactive' | 'trial' | 'unsubscribed';
+  trialEndsAt?: Date;
+}
+
+const defaultSubscriptions: Subscription[] = [
   {
-    id: '1',
     name: 'Netflix',
+    color: '#E50914',
+    enabled: true,
+    description: 'Streaming service subscription',
     amount: 15.99,
     billingCycle: 'monthly',
-    nextBillingDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-    category: 'Entertainment',
+    nextBillingDate: new Date(2024, 2, 15),
     status: 'active',
-    paymentMethod: 'Visa •••• 4242',
-    logoUrl: 'https://cdn4.iconfinder.com/data/icons/logos-and-brands/512/227_Netflix_logo-512.png'
   },
   {
-    id: '2',
-    name: 'Adobe Creative Cloud',
-    amount: 599.88,
-    billingCycle: 'yearly',
-    nextBillingDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-    category: 'Software',
-    status: 'active',
-    paymentMethod: 'Mastercard •••• 8888',
-    logoUrl: 'https://cdn4.iconfinder.com/data/icons/logos-and-brands/512/2_Adobe_logo-512.png'
-  },
-  {
-    id: '3',
     name: 'Spotify',
+    color: '#1DB954',
+    enabled: true,
+    description: 'Music streaming service',
     amount: 9.99,
     billingCycle: 'monthly',
-    nextBillingDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-    category: 'Entertainment',
-    status: 'active',
-    paymentMethod: 'PayPal',
-    logoUrl: 'https://cdn4.iconfinder.com/data/icons/logos-and-brands/512/315_Spotify_logo-512.png'
+    nextBillingDate: new Date(2024, 2, 20),
+    status: 'trial',
+    trialEndsAt: new Date(2024, 3, 20),
   },
   {
-    id: '4',
-    name: 'Gym Membership',
-    amount: 49.99,
+    name: 'Adobe Creative Cloud',
+    color: '#FF0000',
+    enabled: false,
+    description: 'Design software suite',
+    amount: 52.99,
     billingCycle: 'monthly',
-    nextBillingDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-    category: 'Health',
-    status: 'paused',
-    paymentMethod: 'Visa •••• 1234'
+    nextBillingDate: new Date(2024, 2, 25),
+    status: 'unsubscribed',
   },
   {
-    id: '5',
-    name: 'Apple One',
-    amount: 29.99,
+    name: 'AWS',
+    color: '#FF9900',
+    enabled: true,
+    description: 'Cloud services',
+    amount: 150.00,
     billingCycle: 'monthly',
-    nextBillingDate: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
-    category: 'Software',
+    nextBillingDate: new Date(2024, 2, 1),
     status: 'active',
-    paymentMethod: 'Apple Pay',
-    logoUrl: 'https://cdn4.iconfinder.com/data/icons/logos-and-brands/512/23_Apple_logo-512.png'
-  }
-] as const;
+  },
+];
+
+type StatusFilter = 'all' | 'active' | 'trial' | 'inactive' | 'unsubscribed';
 
 export default function SubscriptionsPage() {
-  const handleAddSubscription = useCallback(() => {
-    // TODO: Implement subscription addition with AI assistance
-    toast.success('Adding new subscription');
-  }, []);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>(defaultSubscriptions);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
-  const handleEditSubscription = useCallback((id: string) => {
-    // TODO: Implement subscription editing
-    toast.success(`Editing subscription ${id}`);
-  }, []);
+  const filteredSubscriptions = subscriptions.filter(sub => {
+    if (statusFilter === 'all') return true;
+    return sub.status === statusFilter;
+  });
 
-  const handleCancelSubscription = useCallback((id: string) => {
-    // TODO: Implement subscription cancellation
-    toast.success(`Canceling subscription ${id}`);
-  }, []);
+  const totalMonthly = subscriptions
+    .filter(sub => (sub.status === 'active' || sub.status === 'trial') && sub.billingCycle === 'monthly')
+    .reduce((sum, sub) => sum + sub.amount, 0);
+
+  const getStatusBadge = (status: Subscription['status']) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-500">Active</Badge>;
+      case 'inactive':
+        return <Badge className="bg-gray-500">Inactive</Badge>;
+      case 'trial':
+        return <Badge className="bg-blue-500">Trial</Badge>;
+      case 'unsubscribed':
+        return <Badge variant="destructive">Unsubscribed</Badge>;
+    }
+  };
+
+  // Sort subscriptions by next billing date
+  const sortedSubscriptions = [...filteredSubscriptions].sort((a, b) => 
+    a.nextBillingDate.getTime() - b.nextBillingDate.getTime()
+  );
 
   return (
-    <div className="container mx-auto py-6">
-      <SubscriptionView
-        subscriptions={mockSubscriptions}
-        onAddSubscription={handleAddSubscription}
-        onEditSubscription={handleEditSubscription}
-        onCancelSubscription={handleCancelSubscription}
-      />
+    <div className="container mx-auto p-6 space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Subscriptions</h1>
+          <p className="text-muted-foreground">
+            Monthly Total: ${totalMonthly.toFixed(2)}
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Button>
+            <PlusIcon className="mr-2 h-4 w-4" />
+            Add Subscription
+          </Button>
+          <Button variant="outline">
+            Subscribe
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        {(['all', 'active', 'trial', 'inactive', 'unsubscribed'] as const).map((status) => (
+          <Button
+            key={status}
+            variant={statusFilter === status ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter(status)}
+          >
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </Button>
+        ))}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {sortedSubscriptions.map((subscription) => (
+          <Card key={subscription.name} className="relative overflow-hidden">
+            <div 
+              className="absolute top-0 left-0 w-1 h-full" 
+              style={{ backgroundColor: subscription.color }}
+            />
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <CardTitle className="text-lg">{subscription.name}</CardTitle>
+                </div>
+                {getStatusBadge(subscription.status)}
+              </div>
+              <CardDescription>{subscription.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Amount:</span>
+                  <span className="font-mono font-medium">
+                    ${subscription.amount.toFixed(2)} / {subscription.billingCycle}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Next payment:</span>
+                  <span>{format(subscription.nextBillingDate, 'MMM d, yyyy')}</span>
+                </div>
+                {subscription.status === 'trial' && subscription.trialEndsAt && (
+                  <div className="flex justify-between text-blue-500">
+                    <span>Trial ends:</span>
+                    <span>{format(subscription.trialEndsAt, 'MMM d, yyyy')}</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 } 

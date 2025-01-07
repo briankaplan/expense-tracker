@@ -1,56 +1,60 @@
-import { useEffect, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { User } from '@supabase/supabase-js';
+import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { useRouter } from 'next/navigation';
+import { useCallback } from 'react';
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const supabase = createClientComponentClient();
+  const supabase = useSupabaseClient();
+  const user = useUser();
+  const router = useRouter();
 
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) throw error;
-  };
+    router.push('/dashboard');
+  }, [supabase.auth, router]);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
     if (error) throw error;
-  };
+  }, [supabase.auth]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-  };
+    router.push('/auth/login');
+  }, [supabase.auth, router]);
+
+  const resetPassword = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    });
+    if (error) throw error;
+  }, [supabase.auth]);
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password,
+    });
+    if (error) throw error;
+    router.push('/dashboard');
+  }, [supabase.auth, router]);
 
   return {
     user,
-    loading,
     signIn,
     signUp,
     signOut,
+    resetPassword,
+    updatePassword,
+    isAuthenticated: !!user,
   };
 } 

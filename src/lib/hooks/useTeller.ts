@@ -1,113 +1,68 @@
-import { useState, useCallback } from 'react';
-import { TellerConnect, TellerConnectOptions } from '@/lib/services/teller';
-import { TELLER_APP_ID, TELLER_ENV } from '@/lib/config';
+import { useTellerConnect } from '@teller-io/connect-react';
+import { useCallback } from 'react';
+import { DatabaseService } from '../services/DatabaseService';
 
-interface TellerHookResult {
-  connect: () => void;
-  disconnect: () => void;
-  reconnect: () => void;
-  resync: () => Promise<void>;
-  openTellerConnect: () => void;
-  isConnecting: boolean;
-  isConnected: boolean;
-  isSyncing: boolean;
-  error: Error | null;
-  enrollment: any;
-  lastSynced: string | null;
-  autoSyncEnabled: boolean;
-  toggleAutoSync: () => void;
-}
+export function useTeller() {
+  const { open } = useTellerConnect({
+    applicationId: process.env.NEXT_PUBLIC_TELLER_APPLICATION_ID!,
+    environment: process.env.NEXT_PUBLIC_TELLER_ENVIRONMENT as 'sandbox' | 'development' | 'production',
+    onSuccess: async (enrollment) => {
+      // Handle successful enrollment
+      console.log('Teller enrollment successful:', enrollment);
+      
+      // Here you would typically store the enrollment ID and begin syncing transactions
+      // This could involve setting up a webhook endpoint or polling for new transactions
+    },
+    onExit: (error) => {
+      if (error) {
+        console.error('Teller connection error:', error);
+      }
+    },
+  });
 
-export function useTeller(): TellerHookResult {
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [enrollment, setEnrollment] = useState<any>(null);
-  const [lastSynced, setLastSynced] = useState<string | null>(null);
-  const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
-
-  const openTellerConnect = useCallback(() => {
-    setIsConnecting(true);
-    setError(null);
-
+  const syncTransactions = useCallback(async (enrollmentId: string) => {
     try {
-      const options: TellerConnectOptions = {
-        applicationId: TELLER_APP_ID,
-        environment: TELLER_ENV,
-        onSuccess: (enrollment) => {
-          console.log('Successfully connected bank account:', enrollment);
-          setEnrollment(enrollment);
-          setIsConnected(true);
-          setIsConnecting(false);
-          setLastSynced(new Date().toISOString());
-        },
-        onExit: () => {
-          console.log('User exited Teller Connect');
-          setIsConnecting(false);
-        },
-        onError: (err) => {
-          console.error('Error connecting bank account:', err);
-          setError(err instanceof Error ? err : new Error('Failed to connect bank account'));
-          setIsConnecting(false);
-        },
-      };
+      // Fetch transactions from Teller API
+      const response = await fetch(`/api/teller/transactions/${enrollmentId}`);
+      const transactions = await response.json();
 
-      const teller = new TellerConnect(options);
-      teller.open();
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to initialize Teller Connect'));
-      setIsConnecting(false);
+      // Convert Teller transactions to expenses
+      const expenses = transactions.map((transaction: any) => ({
+        accountId: transaction.account_id,
+        accountName: transaction.account.name,
+        accountType: transaction.account.type,
+        accountLastFour: transaction.account.last_four,
+        institution: transaction.account.institution.name,
+        date: transaction.date,
+        description: transaction.description,
+        amount: Math.abs(transaction.amount),
+        currency: 'USD', // Teller currently only supports USD
+        category: transaction.details?.category || 'uncategorized',
+        status: 'pending',
+        merchant: transaction.details?.merchant?.name,
+        type: 'business', // Default to business, can be updated later
+        details: {
+          isCredit: transaction.amount > 0,
+          originalAmount: transaction.amount,
+          processingStatus: transaction.status,
+          counterpartyType: transaction.details?.counterparty?.type,
+        },
+      }));
+
+      // Batch create expenses
+      for (const expense of expenses) {
+        await DatabaseService.createExpense(expense);
+      }
+
+      return expenses;
+    } catch (error) {
+      console.error('Failed to sync transactions:', error);
+      throw error;
     }
-  }, []);
-
-  const connect = useCallback(() => {
-    openTellerConnect();
-  }, [openTellerConnect]);
-
-  const disconnect = useCallback(() => {
-    setIsConnected(false);
-    setEnrollment(null);
-    setLastSynced(null);
-  }, []);
-
-  const reconnect = useCallback(() => {
-    disconnect();
-    connect();
-  }, [disconnect, connect]);
-
-  const resync = useCallback(async () => {
-    if (!isConnected) return;
-    
-    setIsSyncing(true);
-    try {
-      // Implement sync logic here
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated sync
-      setLastSynced(new Date().toISOString());
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to sync accounts'));
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [isConnected]);
-
-  const toggleAutoSync = useCallback(() => {
-    setAutoSyncEnabled(prev => !prev);
   }, []);
 
   return {
-    connect,
-    disconnect,
-    reconnect,
-    resync,
-    openTellerConnect,
-    isConnecting,
-    isConnected,
-    isSyncing,
-    error,
-    enrollment,
-    lastSynced,
-    autoSyncEnabled,
-    toggleAutoSync,
+    connectBank: open,
+    syncTransactions,
   };
 } 

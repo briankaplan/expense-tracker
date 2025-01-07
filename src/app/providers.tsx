@@ -1,21 +1,25 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TellerProvider } from '@/lib/providers/TellerProvider';
+'use client';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000, // 1 minute
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { SupabaseProvider } from "@/components/providers/SupabaseProvider";
+import { QueryProvider } from "@/components/providers/QueryProvider";
+import { TellerProvider } from "@/components/providers/TellerProvider";
+import { ExpensesProvider } from "@/lib/providers/ExpensesProvider";
+import { Toaster } from "@/components/ui/toaster";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TellerProvider>
-        {children}
-      </TellerProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <SupabaseProvider>
+        <QueryProvider>
+          <TellerProvider>
+            <ExpensesProvider>
+              {children}
+            </ExpensesProvider>
+          </TellerProvider>
+        </QueryProvider>
+      </SupabaseProvider>
+      <Toaster />
+    </ThemeProvider>
   );
 } 

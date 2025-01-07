@@ -1,199 +1,151 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useExpenses } from '@/lib/hooks/useExpenses';
-import type { Expense } from '@/types';
+import { useState } from 'react';
 import { ExpenseList } from './ExpenseList';
-import { ExpenseSummary } from './ExpenseSummary';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { Button } from '@/components/ui/button';
-import { PlusCircle, FileText } from 'lucide-react';
 import { AddExpenseDialog } from './AddExpenseDialog';
-import { formatCurrency } from '@/lib/utils';
-import { ConfirmReportDialog } from './ConfirmReportDialog';
-import type { DateRange } from 'react-day-picker';
-
-interface ExpenseWithReport extends Expense {
-  submitted?: boolean;
-  reportSubmitted?: boolean;
-  status?: 'unmatched' | 'pending';
-}
-
-interface NewExpense {
-  date: string;
-  description: string;
-  amount: number;
-  category: string;
-  type: 'business' | 'personal';
-  memo?: string;
-}
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { PlusIcon, MagnifyingGlassIcon } from '@radix-ui/react-icons';
+import { useExpenses } from '@/lib/providers/ExpensesProvider';
+import { useReceipts } from '@/lib/hooks/useReceipts';
+import { toast } from 'react-hot-toast';
+import type { Expense } from '@/types/expenses';
 
 interface ExpenseManagerViewProps {
   expenses: Expense[];
   isLoading: boolean;
-  error?: Error | null;
-  onUpdateExpense: (id: string, updates: Partial<Expense>) => Promise<void>;
-  onCreateReport: (type: 'business' | 'personal') => Promise<void>;
-  onAddExpense: (expense: NewExpense) => Promise<void>;
+  onExpenseUpdate: (params: { id: string; updates: Partial<Expense> }) => void;
+  onDeleteExpense?: (id: string) => void;
+  onAddExpense?: (expense: Omit<Expense, 'id'>) => void;
+  getExpenseById?: (id: string) => Expense | undefined;
 }
 
-export function ExpenseManagerView({
-  expenses: rawExpenses,
+export function ExpenseManagerView({ 
+  expenses: initialExpenses = [], 
   isLoading,
-  error,
-  onUpdateExpense,
-  onCreateReport,
-  onAddExpense
+  onExpenseUpdate,
+  onDeleteExpense,
+  onAddExpense,
+  getExpenseById
 }: ExpenseManagerViewProps) {
-  const expenses = rawExpenses as ExpenseWithReport[];
-  const [dateRange, setDateRange] = useState<DateRange>();
-  const [showAddExpense, setShowAddExpense] = useState(false);
-  const [isCreatingReport, setIsCreatingReport] = useState<'business' | 'personal' | null>(null);
-  const [reportToConfirm, setReportToConfirm] = useState<'business' | 'personal' | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const { addExpense, matchReceipt } = useExpenses();
+  const { receipts } = useReceipts();
 
-  // Filter out expenses that have been submitted in reports
-  const activeExpenses = useMemo(() => {
-    return expenses.filter((exp: ExpenseWithReport) => !exp.reportSubmitted);
-  }, [expenses]);
+  const filteredExpenses = (initialExpenses || []).filter(expense => {
+    if (!expense) return false;
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      expense.merchant?.toLowerCase().includes(searchLower) ||
+      expense.category?.toLowerCase().includes(searchLower) ||
+      expense.description?.toLowerCase().includes(searchLower)
+    );
+  });
 
-  // Sort and filter expenses
-  const sortedExpenses = useMemo(() => {
-    const filtered = activeExpenses.filter((exp: ExpenseWithReport) => {
-      if (!dateRange?.from) return true;
-      const expDate = new Date(exp.date);
-      return expDate >= dateRange.from && 
-             (!dateRange.to || expDate <= dateRange.to);
-    });
-
-    // Sort by submission status first, then by date
-    return filtered.sort((a: ExpenseWithReport, b: ExpenseWithReport) => {
-      // First sort by submission status
-      if (!a.submitted && b.submitted) return -1;
-      if (a.submitted && !b.submitted) return 1;
-
-      // Then sort by receipt status
-      if (!a.receiptUrl && b.receiptUrl) return -1;
-      if (a.receiptUrl && !b.receiptUrl) return 1;
-
-      // Finally sort by date (newest first)
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-  }, [activeExpenses, dateRange]);
-
-  // Group expenses by type
-  const {
-    businessExpenses,
-    personalExpenses,
-    businessTotal,
-    personalTotal,
-  } = useMemo(() => {
-    const business = sortedExpenses.filter((exp: ExpenseWithReport) => exp.type === 'business');
-    const personal = sortedExpenses.filter((exp: ExpenseWithReport) => exp.type === 'personal');
-
-    return {
-      businessExpenses: business,
-      personalExpenses: personal,
-      businessTotal: business.reduce((sum: number, exp: ExpenseWithReport) => sum + exp.amount, 0),
-      personalTotal: personal.reduce((sum: number, exp: ExpenseWithReport) => sum + exp.amount, 0),
-    };
-  }, [sortedExpenses]);
-
-  // Handle report creation
-  const handleCreateReport = async (type: 'business' | 'personal') => {
-    setIsCreatingReport(type);
+  const handleExpenseUpdate = async (expense: Expense) => {
     try {
-      await onCreateReport(type);
+      await onExpenseUpdate({ id: expense.id, updates: expense });
     } catch (error) {
-      console.error('Failed to create report:', error);
-    } finally {
-      setIsCreatingReport(null);
-      setReportToConfirm(null);
+      console.error('Failed to update expense:', error);
+      toast.error('Failed to update expense');
     }
   };
 
-  const handleAddExpense = async (expense: NewExpense) => {
-    await onAddExpense(expense);
+  const handleExpenseSubmit = async (expense: {
+    date: string;
+    description: string;
+    amount: number;
+    category: string;
+    type?: 'business' | 'personal';
+    memo?: string;
+    receipt?: File;
+    source: 'manual' | 'import';
+    paymentMethod: 'credit' | 'checking' | 'cash';
+    merchant?: string;
+  }) => {
+    try {
+      const newExpense: Omit<Expense, 'id' | 'createdAt'> = {
+        date: expense.date,
+        description: expense.description,
+        amount: expense.amount,
+        category: expense.category,
+        type: expense.type,
+        merchant: expense.merchant,
+        status: 'pending'
+      };
+
+      if (onAddExpense) {
+        await onAddExpense(newExpense as Omit<Expense, 'id'>);
+      } else {
+        await addExpense.mutateAsync(newExpense as Omit<Expense, 'id'>);
+      }
+      setShowAddDialog(false);
+    } catch (error) {
+      console.error('Failed to add expense:', error);
+      toast.error('Failed to add expense');
+    }
   };
 
+  const handleReceiptMatch = async (expenseId: string, receiptId: string) => {
+    try {
+      await matchReceipt({ expenseId, receiptId });
+      const matchedReceipt = receipts?.find(r => r.id === receiptId);
+      if (matchedReceipt) {
+        const expense = filteredExpenses.find(e => e.id === expenseId);
+        if (!expense) return;
+        
+        const updatedExpense: Expense = {
+          ...expense,
+          details: {
+            ...(expense.details || {}),
+            receiptUrl: matchedReceipt.url
+          },
+          status: 'matched',
+          receipt_id: receiptId
+        };
+        await handleExpenseUpdate(updatedExpense);
+      }
+    } catch (error) {
+      console.error('Failed to match receipt:', error);
+      toast.error('Failed to match receipt');
+    }
+  };
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <DateRangePicker
-          value={dateRange}
-          onChange={setDateRange}
-          className="w-[200px]"
-        />
-        <Button onClick={() => setShowAddExpense(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add Manual Expense
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search expenses..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Button onClick={() => setShowAddDialog(true)} className="w-full sm:w-auto">
+          <PlusIcon className="h-4 w-4 mr-2" />
+          Add Expense
         </Button>
       </div>
 
-      {/* Business and Personal Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Business Summary Card */}
-        <div className="rounded-lg border p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Business Expenses</h3>
-            <Button 
-              variant="outline"
-              onClick={() => setReportToConfirm('business')}
-              disabled={businessExpenses.length === 0 || isCreatingReport !== null}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              {isCreatingReport === 'business' ? 'Creating...' : 'Create Report'}
-            </Button>
-          </div>
-          <div className="text-2xl font-bold mb-2">
-            {formatCurrency(businessTotal)}
-          </div>
-        </div>
-
-        {/* Personal Summary Card */}
-        <div className="rounded-lg border p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Personal Expenses</h3>
-            <Button 
-              variant="outline"
-              onClick={() => setReportToConfirm('personal')}
-              disabled={personalExpenses.length === 0 || isCreatingReport !== null}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              {isCreatingReport === 'personal' ? 'Creating...' : 'Create Report'}
-            </Button>
-          </div>
-          <div className="text-2xl font-bold mb-2">
-            {formatCurrency(personalTotal)}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Expense List */}
-      <ExpenseList 
-        expenses={sortedExpenses}
-        isLoading={isLoading}
-        error={error || null}
-        onUpdateExpense={onUpdateExpense}
+      <ExpenseList
+        expenses={filteredExpenses}
+        onExpenseUpdate={handleExpenseUpdate}
+        onReceiptMatch={handleReceiptMatch}
+        onDelete={onDeleteExpense}
       />
 
       <AddExpenseDialog
-        open={showAddExpense}
-        onOpenChange={setShowAddExpense}
-        onSubmit={handleAddExpense}
-      />
-
-      <ConfirmReportDialog
-        open={reportToConfirm !== null}
-        onOpenChange={(open) => !open && setReportToConfirm(null)}
-        onConfirm={() => reportToConfirm && handleCreateReport(reportToConfirm)}
-        type={reportToConfirm || 'business'}
-        expenseCount={reportToConfirm === 'business' ? businessExpenses.length : personalExpenses.length}
-        totalAmount={reportToConfirm === 'business' ? businessTotal : personalTotal}
-        unreceipted={reportToConfirm === 'business' 
-          ? businessExpenses.filter((exp: ExpenseWithReport) => !exp.receiptUrl || exp.status === 'unmatched').length
-          : personalExpenses.filter((exp: ExpenseWithReport) => !exp.receiptUrl || exp.status === 'unmatched').length
-        }
-        isLoading={isCreatingReport !== null}
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        onSubmit={handleExpenseSubmit}
       />
     </div>
   );

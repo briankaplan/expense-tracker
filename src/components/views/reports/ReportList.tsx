@@ -1,152 +1,94 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { ReportCard } from './ReportCard';
-import { OpenReport } from './OpenReport';
-import { useToast } from '@/components/ui/use-toast';
-import { generateReport, exportReport } from '@/lib/services/reports';
-
-interface Report {
-  id: string;
-  type: 'business' | 'personal';
-  status: 'open' | 'closed';
-  totalAmount: number;
-  expenseCount: number;
-  missingReceipts: number;
-  missingComments: number;
-  dateCreated: string;
-  dateClosed?: string;
-  categories: { [key: string]: number };
-  merchants: { [key: string]: number };
-}
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { EyeOpenIcon, DownloadIcon, TrashIcon } from '@radix-ui/react-icons';
+import type { Report } from '@/types/reports';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 interface ReportListProps {
-  type: 'business' | 'personal';
-  showClosed: boolean;
+  reports: Report[];
+  onView?: (report: Report) => void;
+  onDownload?: (report: Report) => void;
+  onDelete?: (report: Report) => void;
 }
 
-export function ReportList({ type, showClosed }: ReportListProps) {
-  const [reports, setReports] = useState<Report[]>([]);
-  const { toast } = useToast();
-
-  const handleGenerateReport = useCallback(async () => {
-    try {
-      const newReport = await generateReport(type);
-      setReports(prev => [...prev, newReport]);
-      toast({
-        title: 'Report Generated',
-        description: `Successfully generated ${type} report.`,
-      });
-    } catch (error) {
-      console.error('Failed to generate report:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate report. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  }, [type, toast]);
-
-  const handleExportReport = useCallback(async (id: string) => {
-    try {
-      await exportReport(id);
-      toast({
-        title: 'Report Exported',
-        description: 'Report has been exported successfully.',
-      });
-    } catch (error) {
-      console.error('Failed to export report:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to export report. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
-
-  const handleApproveReport = useCallback(async (id: string) => {
-    try {
-      setReports(prev => prev.map(report => 
-        report.id === id 
-          ? { ...report, status: 'closed', dateClosed: new Date().toISOString() }
-          : report
-      ));
-      toast({
-        title: 'Report Approved',
-        description: 'Report has been approved and closed.',
-      });
-    } catch (error) {
-      console.error('Failed to approve report:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to approve report. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
-
-  const handleRejectReport = useCallback(async (id: string) => {
-    try {
-      setReports(prev => prev.filter(report => report.id !== id));
-      toast({
-        title: 'Report Rejected',
-        description: 'Report has been rejected and removed.',
-      });
-    } catch (error) {
-      console.error('Failed to reject report:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to reject report. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
-
-  const openReports = reports.filter(report => 
-    report.type === type && report.status === 'open'
-  );
-
-  const closedReports = reports.filter(report => 
-    report.type === type && report.status === 'closed'
-  );
+export function ReportList({ reports, onView, onDownload, onDelete }: ReportListProps) {
+  if (!reports.length) {
+    return (
+      <div className="flex h-[400px] items-center justify-center rounded-lg border border-dashed">
+        <p className="text-muted-foreground">No reports found</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Open Reports Section */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Open Reports</h2>
-        {openReports.length === 0 ? (
-          <OpenReport type={type} onGenerate={handleGenerateReport} />
-        ) : (
-          <div className="grid gap-4">
-            {openReports.map(report => (
-              <ReportCard
-                key={report.id}
-                {...report}
-                onExport={handleExportReport}
-                onApprove={handleApproveReport}
-                onReject={handleRejectReport}
-              />
-            ))}
+    <ScrollArea className="h-[600px] rounded-lg border">
+      <div className="p-4">
+        {reports.map((report) => (
+          <div
+            key={report.id}
+            className="mb-4 flex items-center justify-between rounded-lg border p-4 last:mb-0"
+          >
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{report.title}</span>
+                <Badge
+                  variant={
+                    report.status === 'approved'
+                      ? 'success'
+                      : report.status === 'rejected'
+                      ? 'destructive'
+                      : 'default'
+                  }
+                >
+                  {report.status}
+                </Badge>
+                <Badge variant="outline">{report.type}</Badge>
+              </div>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span>
+                  {formatDate(report.startDate)} - {formatDate(report.endDate)}
+                </span>
+                <span>{formatCurrency(report.totalAmount)}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {onView && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onView(report)}
+                  title="View Report"
+                >
+                  <EyeOpenIcon className="h-4 w-4" />
+                </Button>
+              )}
+              {onDownload && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onDownload(report)}
+                  title="Download Report"
+                >
+                  <DownloadIcon className="h-4 w-4" />
+                </Button>
+              )}
+              {onDelete && report.status === 'draft' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onDelete(report)}
+                  title="Delete Report"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
-        )}
+        ))}
       </div>
-
-      {/* Closed Reports Section */}
-      {showClosed && closedReports.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Closed Reports</h2>
-          <div className="grid gap-4">
-            {closedReports.map(report => (
-              <ReportCard
-                key={report.id}
-                {...report}
-                onExport={handleExportReport}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    </ScrollArea>
   );
 } 

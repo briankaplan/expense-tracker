@@ -14,17 +14,15 @@ export interface ReportExpense extends Expense {
 
 export interface Report {
   id: string;
-  type: ReportType;
-  status: ReportStatus;
+  title: string;
+  type: 'business' | 'personal';
+  startDate: string;
+  endDate: string;
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
   totalAmount: number;
-  expenseCount: number;
-  missingReceipts: number;
-  missingComments: number;
-  dateCreated: string;
-  dateClosed?: string;
-  expenses: ReportExpense[];
-  categories: { [key: string]: number };
-  merchants: { [key: string]: number };
+  createdAt: string;
+  updatedAt: string;
+  metadata?: Record<string, any>;
 }
 
 export interface ReportFilters {

@@ -1,0 +1,152 @@
+{
+  "project": {
+    "name": "expense-tracker",
+    "version": "0.1.0",
+    "description": "AI-powered expense tracking and receipt management",
+    "type": "web-application",
+    "framework": "next.js"
+  },
+  "brain": {
+    "version": "1.0.0",
+    "features": {
+      "stateTracking": true,
+      "dependencyAnalysis": true,
+      "codeQuality": true,
+      "securityChecks": true,
+      "backupManagement": true
+    },
+    "monitors": {
+      "criticalPath": true,
+      "dependencies": true,
+      "typeChecking": true,
+      "linting": true,
+      "testing": false
+    }
+  },
+  "integrations": {
+    "current": [
+      {
+        "name": "supabase",
+        "type": "auth-database",
+        "status": "active",
+        "version": "2.39.0"
+      },
+      {
+        "name": "teller",
+        "type": "banking",
+        "status": "active",
+        "version": "0.2.0"
+      },
+      {
+        "name": "mindee",
+        "type": "ocr",
+        "status": "active",
+        "version": "4.21.0"
+      },
+      {
+        "name": "openai",
+        "type": "ai",
+        "status": "active",
+        "version": "4.77.3"
+      },
+      {
+        "name": "gmail",
+        "type": "email",
+        "status": "active",
+        "version": "129.0.0"
+      },
+      {
+        "name": "cloudflare-r2",
+        "type": "storage",
+        "status": "active",
+        "version": "3.0.0"
+      }
+    ],
+    "removed": [
+      {
+        "name": "firebase",
+        "type": "auth-database",
+        "status": "removed",
+        "reason": "Replaced with Supabase for better integration and features"
+      }
+    ],
+    "planned": [
+      {
+        "name": "dropbox",
+        "type": "backup",
+        "status": "planned",
+        "priority": "high"
+      },
+      {
+        "name": "apple-shortcuts",
+        "type": "automation",
+        "status": "planned",
+        "priority": "medium"
+      }
+    ]
+  },
+  "guard": {
+    "rules": [
+      {
+        "type": "dependency",
+        "rule": "no-firebase",
+        "message": "Firebase has been replaced with Supabase"
+      },
+      {
+        "type": "import",
+        "rule": "correct-paths",
+        "message": "Use correct import paths (@/ for src directory)"
+      },
+      {
+        "type": "structure",
+        "rule": "maintain-layout",
+        "message": "Maintain the app directory structure"
+      }
+    ],
+    "criticalFiles": [
+      "app/layout.tsx",
+      "lib/providers/AuthProvider.tsx",
+      "lib/supabase/config.ts",
+      "lib/services/teller.ts"
+    ]
+  },
+  "recovery": {
+    "checkpoints": {
+      "enabled": true,
+      "frequency": "daily",
+      "location": "./recovery"
+    },
+    "backups": {
+      "git": {
+        "enabled": true,
+        "branch": "backup/expense-tracker-updates"
+      },
+      "local": {
+        "enabled": true,
+        "path": "./backups"
+      }
+    }
+  },
+  "development": {
+    "environments": {
+      "local": {
+        "url": "http://localhost:3000",
+        "variables": ".env.local"
+      },
+      "development": {
+        "url": "https://dev.expense-tracker.app",
+        "variables": ".env.development"
+      },
+      "production": {
+        "url": "https://expense-tracker.app",
+        "variables": ".env.production"
+      }
+    },
+    "scripts": {
+      "verify": "npm run verify:full",
+      "analyze": "npm run analyze:scripts",
+      "backup": "npm run nexus:save",
+      "restore": "npm run nexus:load"
+    }
+  }
+} 
